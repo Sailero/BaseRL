@@ -35,7 +35,7 @@ class Critic(ChkptModule):
 
         # 获取 args 中的维度信息
         self.obs_input_dim = args.agent_obs_dim
-        self.fc_input_dim = self.obs_input_dim + agent_action_dim
+        self.fc_input_dim = self.obs_input_dim + args.agent_action_dim
         self.hidden_dim = args.critic_hidden_dim
         self.output_dim = 1
 

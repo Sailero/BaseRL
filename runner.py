@@ -66,8 +66,7 @@ class Runner:
         train_step = 0
         for episode in tqdm(range(self.train_episodes)):
             # 2.1 初始化环境
-            self.env.reset()
-            obs = self.env.get_observation()
+            obs = self.env.reset()
 
             # 记录对局reward
             agent_episode_reward = 0
@@ -102,7 +101,7 @@ class Runner:
             # 2.3 增加对局和奖励记录
             game_results.append(done)
             agent_returns.append(agent_episode_reward)
-            train_episode_step.append(step)
+            train_episode_step.append(step + 1)
 
             # 2.4 当训练没有完成时，任意一个智能体奖励提高时，保存模型，同时保存奖励数据
             if (episode + 1) % self.display_episodes == 0:
@@ -148,8 +147,7 @@ class Runner:
         # 交互演示
         for episode in tqdm(range(self.evaluate_episodes)):
             # 初始化环境
-            self.env.reset()
-            obs = self.env.get_observation()
+            obs = self.env.reset()
 
             # 记录对局reward
             agent_episode_reward = 0
@@ -158,7 +156,7 @@ class Runner:
             for step in range(self.max_episode_len):
                 # 可视化展示
                 self.env.render()
-                time.sleep(0.02)
+                time.sleep(0.08)
 
                 # 智能体选择动作
                 action = self.agent.choose_action(obs)

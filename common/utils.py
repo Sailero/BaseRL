@@ -41,12 +41,16 @@ def plot_returns_curves(agent_returns, plt_save_path):
 
 def make_env(args):
     # 创建环境
-    env = Env()
-    env.reset()
+    from env.env import Env
+    env = Env(args)
 
-    # 获取环境中智能体训练的维度
-    args.agent_obs_dim = env.obs_dim
-    args.agent_action_dim = env.action_dim
+    # 获取观测信息
+    args.agent_obs_dim = env.agent_obs_dim
+
+    # 获取动作信息
+    args.agent_action_dim = env.agent_action_dim
+
+    args.max_episode_len = env.max_episode_len
 
     # 获取训练中的保存路径
     args.save_path = os.path.join(args.save_dir, args.scenario_name)

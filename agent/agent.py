@@ -10,6 +10,7 @@ class Agent:
         self.policy_type = args.policy_type
         self.device = args.device
 
+
         # 定义智能体的策略
         if self.policy_type == 'DDPG':
             from policy.DDPG import DDPG
@@ -25,7 +26,7 @@ class Agent:
 
     def choose_action(self, observation):
         # 将输入放在gpu上运行
-        observation = torch.tensor(observation, dtype=torch.float32).to(self.device)
+        observation = torch.tensor(observation, dtype=torch.float64).to(self.device)
 
         # 获取动作
         action = self.policy.choose_action(observation)
@@ -36,10 +37,10 @@ class Agent:
         self.policy.train(transitions)
 
     def save_checkpoint(self):
-        print(f'... saving agent{self.Id} checkpoint ...')
+        print(f'... saving agent checkpoint ...')
         self.policy.save_models()
 
     def load_checkpoint(self):
-        print(f'... loading agent{self.Id} checkpoint ...')
+        print(f'... loading agent checkpoint ...')
         self.policy.load_models()
 

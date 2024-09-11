@@ -9,13 +9,15 @@ Here are the param for the training
 def get_args():
     parser = argparse.ArgumentParser("Reinforcement Learning experiments for single agent environments")
     # 训练的环境
-    parser.add_argument("--scenario-name", type=str, default="simple", help="scenario name for simulation")
+    parser.add_argument("--scenario-name", type=str, default="simple",
+                        help="scenario name for simulation."
+                             " example:MountainCarContinuous-v0; Pendulum-v1; simple")
 
     # 定义架构上的训练参数
     parser.add_argument("--max-episode-len", type=int, default=100, help="maximum episode length")
-    parser.add_argument("--train-episodes", type=int, default=10000, help="number of time steps")
+    parser.add_argument("--train-episodes", type=int, default=4000, help="number of time steps")
     parser.add_argument("--load-pre-model", type=bool, default=False, help="whether to load the previous model")
-    parser.add_argument("--policy-type", type=str, default='PPO', help="the policy type of single agent")
+    parser.add_argument("--policy-type", type=str, default='DDPG', help="the policy type of single agent")
 
     # 定义训练时的核心参数
     parser.add_argument("--actor_hidden_dim", type=int, default=64, help="hidden dims of actor network")
@@ -39,9 +41,9 @@ def get_args():
 
     # 定义可视化的相关参数
     parser.add_argument("--compare", type=bool, default=False, help="whether to compare or not")
-    parser.add_argument("--evaluate", type=bool, default=False, help="whether to evaluate or not")
+    parser.add_argument("--evaluate", type=bool, default=True, help="whether to evaluate or not")
     parser.add_argument("--evaluate-episodes", type=int, default=100, help="number of episodes for evaluating")
-    parser.add_argument("--display-episodes", type=int, default=1000, help="number of episodes for printing and plotting results")
+    parser.add_argument("--display-episodes", type=int, default=200, help="number of episodes for printing and plotting results")
     args = parser.parse_args()
 
     return args

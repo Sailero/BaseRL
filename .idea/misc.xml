@@ -3,5 +3,5 @@
   <component name="Black">
     <option name="sdkName" value="D:\Software\Anaconda" />
   </component>
-  <component name="ProjectRootManager" version="2" project-jdk-name="D:\Software\Anaconda" project-jdk-type="Python SDK" />
+  <component name="ProjectRootManager" version="2" project-jdk-name="gpu_py_310" project-jdk-type="Python SDK" />
 </project>
