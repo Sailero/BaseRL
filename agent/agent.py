@@ -33,8 +33,11 @@ class Agent:
         return action
 
     def train(self):
-        transitions = self.buffer.sample()
-        self.policy.train(transitions)
+        if self.policy_type in ['DDPG', 'DQN']:
+            transitions = self.buffer.sample()
+            self.policy.train(transitions)
+        else:
+            self.policy.train()
 
     def save_checkpoint(self):
         print(f'... saving agent checkpoint ...')

@@ -18,6 +18,7 @@ class Runner:
     def __init__(self, args, env):
         # 加载环境
         self.env = env
+        self.device = args.device
 
         # 加载args中训练有关参数
         self.max_episode_len = args.max_episode_len
@@ -80,16 +81,29 @@ class Runner:
                 with torch.no_grad():
                     obs_, reward, done, info = self.env.step(action)
 
-                # 2.2.3 存储信息（根据算法需要）
-                    self.agent.buffer.store_episode(obs, action, reward, obs_, done)
+                    # 2.2.3 存储信息（根据算法需要）
+                    if self.agent.policy_type in ['DDPG', 'DQN']:
+                        self.agent.buffer.store_episode(obs, action, reward, obs_, done)
+                    else:
+                        obs_tensor = torch.tensor(obs, dtype=torch.float32).unsqueeze(0).to(self.device)
+                        action_tensor = torch.tensor(action, dtype=torch.float32).unsqueeze(0).to(self.device)
+                        pi_mu, pi_std = self.agent.policy.actor_network(obs_tensor)
+                        dist = torch.distributions.Normal(pi_mu, pi_std)
+                        log_prob = dist.log_prob(action_tensor).sum(-1).cpu()
+                        value = self.agent.policy.critic_network(obs_tensor).cpu()
+                        self.agent.policy.buffer.store_episode(obs, action, log_prob, reward, obs_, done, value)
 
                 # 2.2.4 更新信息
                 obs = obs_
                 train_step += 1
 
                 # 2.2.5 智能体训练，每隔10步训练一次
-                if self.agent.buffer.ready() and train_step % 10 == 0:
-                    self.agent.train()
+                if self.agent.policy_type in ['DDPG', 'DQN']:
+                    if self.agent.buffer.ready() and train_step % 10 == 0:
+                        self.agent.train()
+                else:
+                    if self.agent.policy.buffer.ready():
+                        self.agent.train()
 
                 # 2.2.6 记录对局reward
                 agent_episode_reward += reward
