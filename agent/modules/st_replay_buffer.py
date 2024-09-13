@@ -4,7 +4,7 @@ import numpy as np
 class Buffer:
     def __init__(self, args):
         # Initialize the arguments parameters
-        self.buffer_size = args.update_steps
+        self.buffer_size = args.st_buffer_size
         self.agent_obs_dim = args.agent_obs_dim
         self.agent_action_dim = args.agent_action_dim
 
@@ -20,30 +20,37 @@ class Buffer:
         self.buffer['log_prob'][self.store_i] = log_prob
         self.buffer['value'][self.store_i] = value
 
-        self.current_size = min(self.current_size + 1, self.buffer_size)
-        self.store_i = (self.store_i + 1) % self.buffer_size
+        self.store_i = self.store_i + 1
+
+    def sample(self):
+        sample_buffer = {}
+        batch_id = np.arange(self.store_i)
+        for key in self.buffer.keys():
+            sample_buffer[key] = self.buffer[key][batch_id]
+
+        self.initial_buffer()
+        return sample_buffer
+
 
     def ready(self):
-        if self.current_size < self.buffer_size:
+        if self.store_i < self.buffer_size:
             return False
         else:
-            self.current_size = 0
             return True
 
     def initial_buffer(self):
         # memory management
-        self.current_size = 0
         self.store_i = 0
 
         # Initial buffer
         self.buffer = dict()
-        self.buffer['reward'] = np.empty([self.buffer_size, 1])
-        self.buffer['done'] = np.empty([self.buffer_size, 1], dtype=bool)
-        self.buffer['obs'] = np.empty([self.buffer_size, self.agent_obs_dim])
-        self.buffer['action'] = np.empty([self.buffer_size, self.agent_action_dim])
-        self.buffer['next_obs'] = np.empty([self.buffer_size, self.agent_obs_dim])
+        self.buffer['reward'] = np.zeros([self.buffer_size, 1])
+        self.buffer['done'] = np.zeros([self.buffer_size, 1], dtype=bool)
+        self.buffer['obs'] = np.zeros([self.buffer_size, self.agent_obs_dim])
+        self.buffer['action'] = np.zeros([self.buffer_size, self.agent_action_dim])
+        self.buffer['next_obs'] = np.zeros([self.buffer_size, self.agent_obs_dim])
 
-        self.buffer['log_prob'] = np.empty([self.buffer_size, 1])
-        self.buffer['value'] = np.empty([self.buffer_size, 1])
+        self.buffer['log_prob'] = np.zeros([self.buffer_size, 1])
+        self.buffer['value'] = np.zeros([self.buffer_size, 1])
 
 

@@ -15,7 +15,7 @@ state_number=env.observation_space.shape[0]
 action_number=env.action_space.shape[0]
 max_action = env.action_space.high[0]
 min_action = env.action_space.low[0]
-torch.manual_seed(0)#如果你觉得定了随机种子不能表达代码的泛化能力，你可以把这两行注释掉
+# torch.manual_seed(0)#如果你觉得定了随机种子不能表达代码的泛化能力，你可以把这两行注释掉
 # env.seed(0)
 RENDER=False
 EP_MAX = 1000
@@ -23,7 +23,7 @@ EP_LEN = 200
 GAMMA = 0.9
 A_LR = 0.0001
 C_LR = 0.0003
-BATCH = 4
+BATCH = 128
 A_UPDATE_STEPS = 10
 C_UPDATE_STEPS = 10
 METHOD = [
@@ -31,6 +31,8 @@ METHOD = [
     dict(name='clip', epsilon=0.2),                 # Clipped surrogate objective, find this is better
 ][1]        # choose the method for optimization
 Switch=0
+if Switch:
+    env = gym.make('Pendulum-v1', render_mode='human').unwrapped
 '''由于PPO也是基于A-C框架，所以我把PPO的编写分为两部分，PPO的第一部分 Actor'''
 '''PPO的第一步  编写A-C框架的网络，先编写actor部分的actor网络，actor的网络有新与老两个网络'''
 class ActorNet(nn.Module):
@@ -80,18 +82,18 @@ class Actor():
     def update_oldpi(self):
         self.old_pi.load_state_dict(self.new_pi.state_dict())
     '''第六步 编写actor网络的学习函数，采用PPO2，即OpenAI推出的clip形式公式'''
-    def learn(self,bs,ba,adv,bap):
-        bs = torch.FloatTensor(bs)
-        ba = torch.FloatTensor(ba)
-        adv = torch.FloatTensor(adv)
-        bap = torch.FloatTensor(bap)
+    def learn(self,batch_obs,batch_action,advantage,batch_action_prob):
+        batch_obs = torch.FloatTensor(batch_obs)
+        batch_action = torch.FloatTensor(batch_action)
+        advantage = torch.FloatTensor(advantage)
+        batch_action_prob = torch.FloatTensor(batch_action_prob)
         for _ in range(A_UPDATE_STEPS):
-            mean, std = self.new_pi(bs)
+            mean, std = self.new_pi(batch_obs)
             dist_new=torch.distributions.Normal(mean, std)
-            action_new_logprob=dist_new.log_prob(ba)
-            ratio=torch.exp(action_new_logprob - bap.detach())
-            surr1 = ratio * adv
-            surr2 = torch.clamp(ratio, 1 - METHOD['epsilon'], 1 + METHOD['epsilon']) * adv
+            action_new_logprob=dist_new.log_prob(batch_action)
+            ratio=torch.exp(action_new_logprob - batch_action_prob.detach())
+            surr1 = ratio * advantage
+            surr2 = torch.clamp(ratio, 1 - METHOD['epsilon'], 1 + METHOD['epsilon']) * advantage
             loss = -torch.min(surr1, surr2)
             loss=loss.mean()
             self.optimizer.zero_grad()
@@ -108,17 +110,17 @@ class Critic():
         inputstate = torch.FloatTensor(s)
         return self.critic_v(inputstate)
     '''第五步  计算优势——————advantage，后面发现第五步计算出来的adv可以与第七步合为一体，所以这里的代码注释了，但是，计算优势依然算是可以单独拎出来的一个步骤'''
-    # def get_adv(self,bs,br):
-    #     reality_v=torch.FloatTensor(br)
-    #     v=self.get_v(bs)
-    #     adv=(reality_v-v).detach()
-    #     return adv
+    # def get_adv(self,batch_obs,batch_reward):
+    #     reality_v=torch.FloatTensor(batch_reward)
+    #     v=self.get_v(batch_obs)
+    #     advantage=(reality_v-v).detach()
+    #     return advantage
     '''第七步  编写actor-critic的critic部分的learn函数，td-error的计算代码（V现实减去V估计就是td-error）'''
-    def learn(self,bs,br):
-        bs = torch.FloatTensor(bs)
-        reality_v = torch.FloatTensor(br)
+    def learn(self,batch_obs,batch_reward):
+        batch_obs = torch.FloatTensor(batch_obs)
+        reality_v = torch.FloatTensor(batch_reward)
         for _ in range(C_UPDATE_STEPS):
-            v=self.get_v(bs)
+            v=self.get_v(batch_obs)
             td_e = self.lossfunc(reality_v, v)
             self.optimizer.zero_grad()
             td_e.backward()
@@ -156,12 +158,12 @@ if Switch==0:
                     v_observation_ = reward + GAMMA * v_observation_
                     discounted_r.append(v_observation_.detach().numpy())
                 discounted_r.reverse()
-                bs, ba, br,bap = np.vstack(buffer_s), np.vstack(buffer_a), np.array(discounted_r),np.vstack(buffer_a_logp)
+                batch_obs, batch_action, batch_reward,batch_action_prob = np.vstack(buffer_s), np.vstack(buffer_a), np.array(discounted_r),np.vstack(buffer_a_logp)
                 buffer_s, buffer_a, buffer_r,buffer_a_logp = [], [], [],[]
-                advantage=critic.learn(bs,br)#critic部分更新
-                actor.learn(bs,ba,advantage,bap)#actor部分更新
+                advantage=critic.learn(batch_obs,batch_reward)#critic部分更新
+                actor.learn(batch_obs,batch_action,advantage,batch_action_prob)#actor部分更新
                 actor.update_oldpi()  # pi-new的参数赋给pi-old
-                # critic.learn(bs,br)
+                # critic.learn(batch_obs,batch_reward)
         if episode == 0:
             all_ep_r.append(reward_totle)
         else:

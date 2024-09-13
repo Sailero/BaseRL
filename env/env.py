@@ -30,7 +30,7 @@ class GymEnv:
 
     def step(self, action):
         # 反归一化
-        action = action * (self.action_high - self.action_low) + self.action_low
+        action = action * self.action_high
         obs_, reward, done, info1, info2 = self.env.step(action)
         return obs_, reward, done, [info1, info2]
 
@@ -64,7 +64,7 @@ class MpeEnv:
 
     def step(self, action):
         # 反归一化
-        action = (np.array(action) * (self.action_high - self.action_low) + self.action_low).tolist()
+        action = (np.array(action) * self.action_high).tolist()
         action_n = [action]
         obs_, reward, done, info = self.env.step(action_n)
         return obs_[0], reward[0], done[0], info

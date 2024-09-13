@@ -19,6 +19,11 @@ class Actor(ChkptModule):
         self.action_out = nn.Linear(self.hidden_dim, self.output_dim)
         self.std_out = nn.Linear(self.hidden_dim, self.output_dim)
 
+        self.fc1.weight.data.normal_(0, 0.1)
+        self.fc2.weight.data.normal_(0, 0.1)
+        self.action_out.weight.data.normal_(0, 0.1)
+        self.std_out.weight.data.normal_(0, 0.1)
+
     def forward(self, x):
         # 转换观测三维为二维
         x = x.reshape([-1, self.fc_input_dim])
@@ -27,7 +32,7 @@ class Actor(ChkptModule):
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
         actions = torch.tanh(self.action_out(x))
-        std = F.softplus(self.action_out(x))
+        std = F.softplus(self.std_out(x))
         return actions, std
 
 
@@ -44,6 +49,10 @@ class Critic(ChkptModule):
         self.fc1 = nn.Linear(self.fc_input_dim, self.hidden_dim)
         self.fc2 = nn.Linear(self.hidden_dim, self.hidden_dim)
         self.q_out = nn.Linear(self.hidden_dim, 1)
+
+        self.fc1.weight.data.normal_(0, 0.1)
+        self.fc2.weight.data.normal_(0, 0.1)
+        self.q_out.weight.data.normal_(0, 0.1)
 
     def forward(self, state):
         # 转化观测三维为二维，并concat与action

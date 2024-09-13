@@ -1,7 +1,7 @@
 import torch
 from modules.st_replay_buffer import Buffer
 from modules.st_actor_critic import Actor, Critic
-
+import numpy as np
 
 class PPO:
     def __init__(self, args):
@@ -30,11 +30,12 @@ class PPO:
         self.critic_optim = torch.optim.Adam(self.critic_network.parameters(), lr=args.lr_critic)
 
     # GAE (Generalized Advantage Estimation)
-    def compute_gae(self, rewards, values, next_value, dones):
+    def compute_gae(self, rewards, values, next_values, dones):
         advantages = []
         advantage = 0
         for t in reversed(range(len(rewards))):
-            delta = rewards[t] + self.gamma * next_value[t] * (1 - dones[t]) - values[t]
+            # 这里next_value和values都是length长度的列表or数组。其中next_value为value[1:]，values是value[:-1]
+            delta = rewards[t] + self.gamma * next_values[t] * (1 - dones[t]) - values[t]
             advantage = delta + self.gamma * self.lam * advantage * (1 - dones[t])
             advantages.insert(0, advantage)
         return advantages
@@ -42,7 +43,7 @@ class PPO:
     # update the network
     def train(self):
         # 采样transitions
-        transitions = self.buffer.buffer
+        transitions = self.buffer.sample()
 
         # 将所有的转移迁移到GPU
         for key in transitions.keys():
@@ -51,49 +52,51 @@ class PPO:
         batch_action = transitions['action']
         batch_log_prob = transitions['log_prob']
         batch_reward = transitions['reward']
+
         batch_next_obs = transitions['next_obs']
         batch_done = transitions['done']
         batch_value = transitions['value']
 
         # Calculate target values and advantages
         with torch.no_grad():
-            next_value = self.critic_network(batch_next_obs)
-            advantages = self.compute_gae(batch_reward, batch_value, next_value, batch_done)
-            advantages = torch.tensor(advantages, dtype=torch.float32).to(self.device)
-            returns = advantages + batch_value
+            batch_next_value = self.critic_network(batch_next_obs)
+            advantages = self.compute_gae(batch_reward, batch_value, batch_next_value, batch_done)
+            advantages = torch.tensor(advantages, dtype=torch.float32).reshape(batch_next_value.shape).to(self.device)
+            returns = advantages + batch_value  # Rt = At + V(st)
 
         for _ in range(self.update_steps):
             # Actor update: calculate ratio (pi / pi_old)
             pi_mu, pi_std = self.actor_network(batch_obs)
             dist = torch.distributions.Normal(pi_mu, pi_std)
-            log_prob = dist.log_prob(batch_action).sum(-1)
-            ratio = torch.exp(log_prob - batch_log_prob)
+            batch_new_log_prob = dist.log_prob(batch_action).sum(-1, keepdim=True)
+            ratio = torch.exp(batch_new_log_prob - batch_log_prob.detach())
 
             # Clipped surrogate objective
             surr1 = ratio * advantages
             surr2 = torch.clamp(ratio, 1 - self.eps_clip, 1 + self.eps_clip) * advantages
-            actor_loss = -torch.min(surr1, surr2).mean()
 
             # Add entropy to encourage exploration
             entropy = dist.entropy().mean()
-            actor_loss -= self.ent_coef * entropy
+            actor_loss = -torch.min(surr1, surr2).mean()  # - self.ent_coef * entropy
 
             # Critic update
             q_value = self.critic_network(batch_obs)
             critic_loss = (returns - q_value).pow(2).mean()
 
             # Total loss
-            total_loss = actor_loss  + self.value_loss_coef * critic_loss
+            # total_loss = actor_loss  + self.value_loss_coef * critic_loss
 
             # Update the network
             self.actor_optim.zero_grad()
-            total_loss.backward()
-            torch.nn.utils.clip_grad_norm_(self.actor_network.parameters(), self.max_grad_norm)
-            self.actor_optim.step()
-
             self.critic_optim.zero_grad()
+
+            # total_loss.backward()
+            actor_loss.backward()
             critic_loss.backward()
+
+            torch.nn.utils.clip_grad_norm_(self.actor_network.parameters(), self.max_grad_norm)
             torch.nn.utils.clip_grad_norm_(self.critic_network.parameters(), self.max_grad_norm)
+            self.actor_optim.step()
             self.critic_optim.step()
 
         # Clear the memory after each update
@@ -102,10 +105,15 @@ class PPO:
     def choose_action(self, observation):
         # Choose action based on actor network
         inputs = torch.tensor(observation, dtype=torch.float32).unsqueeze(0).to(self.device)
-        pi_mu, pi_std = self.actor_network(inputs)
+        with torch.no_grad():
+            pi_mu, pi_std = self.actor_network(inputs)
+            pi_mu, pi_std = pi_mu.reshape(-1), pi_std.reshape(-1)
+            print('pi_mu', pi_mu, 'pi_std', pi_std)
         dist = torch.distributions.Normal(pi_mu, pi_std)
-        action = dist.sample()[0].cpu().detach().numpy()
-
+        action = dist.sample()
+        action = action.cpu().detach().numpy()
+        # action_log_prob = dist.log_prob(action)
+        action = np.clip(action, -1, 1)
         return action.tolist()
 
     def save_models(self):
