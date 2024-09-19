@@ -1,4 +1,3 @@
-from modules.replay_buffer import Buffer
 import torch
 
 
@@ -14,15 +13,20 @@ class Agent:
         # 定义智能体的策略
         if self.policy_type == 'DDPG':
             from policy.DDPG import DDPG
+            from modules.replay_buffer import Buffer
             self.policy = DDPG(args)
             self.buffer = Buffer(args)
         elif self.policy_type == 'DQN':
             from policy.DQN import DQN
+            from modules.replay_buffer import Buffer
             self.policy = DQN(args)
             self.buffer = Buffer(args)
         elif self.policy_type == 'PPO':
+            from modules.online_replay_buffer import Buffer
             from policy.PPO import PPO
+            self.buffer = Buffer(args)
             self.policy = PPO(args)
+            self.update_nums = args.update_nums
 
     def choose_action(self, observation):
         # 将输入放在gpu上运行
@@ -33,11 +37,12 @@ class Agent:
         return action
 
     def train(self):
-        if self.policy_type in ['DDPG', 'DQN']:
-            transitions = self.buffer.sample()
-            self.policy.train(transitions)
-        else:
-            self.policy.train()
+        transitions = self.buffer.sample()
+        self.policy.train(transitions)
+
+        if self.policy_type in ['PPO']:
+            self.buffer.initial_buffer()
+
 
     def save_checkpoint(self):
         print(f'... saving agent checkpoint ...')

@@ -24,9 +24,9 @@ def plot_returns_curves(agent_returns, plt_save_path):
     # 绘图
     plt.figure()
     plt.plot(range(len(agent_returns)), smooth(agent_returns, weight=0.8), label='origin',
-             linewidth=4, alpha=0.1)
+             linewidth=4, alpha=0.1, c='blue')
     plt.plot(range(len(agent_returns)), smooth(agent_returns, weight=0.96), label='smooth',
-             linewidth=0.5, alpha=1)
+             linewidth=0.5, alpha=1, c='blue')
     plt.legend()
     plt.title(f'Forklift agent train returns')
     plt.xlabel('episode')

@@ -11,14 +11,12 @@ class Buffer:
         # Initialize the buffer
         self.initial_buffer()
 
-    def store_episode(self, obs, action, log_prob, reward, next_obs_n, done, value):
+    def store_episode(self, obs, action, reward, next_obs, done):
         self.buffer['reward'][self.store_i] = reward
         self.buffer['done'][self.store_i] = done
         self.buffer['obs'][self.store_i] = obs
         self.buffer['action'][self.store_i] = action
-        self.buffer['next_obs'][self.store_i] = next_obs_n
-        self.buffer['log_prob'][self.store_i] = log_prob
-        self.buffer['value'][self.store_i] = value
+        self.buffer['next_obs'][self.store_i] = next_obs
 
         self.store_i = self.store_i + 1
 
@@ -28,7 +26,6 @@ class Buffer:
         for key in self.buffer.keys():
             sample_buffer[key] = self.buffer[key][batch_id]
 
-        self.initial_buffer()
         return sample_buffer
 
 
@@ -49,8 +46,5 @@ class Buffer:
         self.buffer['obs'] = np.zeros([self.buffer_size, self.agent_obs_dim])
         self.buffer['action'] = np.zeros([self.buffer_size, self.agent_action_dim])
         self.buffer['next_obs'] = np.zeros([self.buffer_size, self.agent_obs_dim])
-
-        self.buffer['log_prob'] = np.zeros([self.buffer_size, 1])
-        self.buffer['value'] = np.zeros([self.buffer_size, 1])
 
 

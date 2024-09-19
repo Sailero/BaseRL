@@ -75,27 +75,24 @@ class Runner:
             # 2.2 开始episode内的迭代
             for step in range(self.max_episode_len):
                 # 2.2.1 智能体选择动作
-                action= self.agent.choose_action(obs)
+                action = self.agent.choose_action(obs)
 
                 # 2.2.2 智能体更新状态
                 with torch.no_grad():
                     obs_, reward, done, info = self.env.step(action)
 
+                    if step == self.max_episode_len - 1:
+                        done = True
+
                     # 2.2.3 存储信息（根据算法需要）
-                    obs_tensor = torch.tensor(obs, dtype=torch.float32).unsqueeze(0).to(self.device)
-                    action_tensor = torch.tensor(action, dtype=torch.float32).unsqueeze(0).to(self.device)
-                    pi_mu, pi_std = self.agent.policy.actor_network(obs_tensor)
-                    dist = torch.distributions.Normal(pi_mu, pi_std)
-                    log_prob = dist.log_prob(action_tensor).sum(-1).cpu().item()
-                    value = self.agent.policy.critic_network(obs_tensor).cpu().item()
-                    self.agent.policy.buffer.store_episode(obs, action, log_prob, reward, obs_, done, value)
+                    self.agent.buffer.store_episode(obs, action, reward, obs_, done)
 
                 # 2.2.4 更新信息
                 obs = obs_
                 train_step += 1
 
                 # 2.2.5 智能体训练，每隔10步训练一次
-                if self.agent.policy.buffer.ready() or done or step == self.max_episode_len - 1:
+                if self.agent.buffer.ready():
                     self.agent.train()
 
                 # 2.2.6 记录对局reward

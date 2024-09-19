@@ -32,7 +32,7 @@ class Actor(ChkptModule):
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
         actions = torch.tanh(self.action_out(x))
-        std = F.softplus(self.std_out(x))
+        std = F.softplus(self.std_out(x)) + 1e-3
         return actions, std
 
 

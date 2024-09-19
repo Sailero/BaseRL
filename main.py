@@ -26,4 +26,4 @@ if __name__ == '__main__':
             print(f"Training finished using GPU: {torch.cuda.get_device_name(0)}")
         else:
             print("Training finished using CPU")
-        runner.compare_models_curves()
+        # runner.compare_models_curves()
