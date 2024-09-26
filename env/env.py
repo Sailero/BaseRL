@@ -73,6 +73,38 @@ class MpeEnv:
         self.env.render()
 
 
+class ForkliftEnv:
+    def __init__(self):
+        from forklift.isaac_sim_env_client import IsaacSimEnvClient
+        self.env = IsaacSimEnvClient()
+
+        self.agent_obs_dim = list(self.env.observation_space)
+        self.agent_action_dim = self.env.action_space[0]
+
+        self.action_low = 0
+        self.action_high = 1
+
+        self.max_episode_len = 200
+
+    def reset(self):
+        obs, info = self.env.reset()
+        return obs
+
+    def step(self, action):
+        action = np.array(action)
+        obs_, reward, terminated, truncated, info = self.env.step(action)
+        done = False
+        if terminated or truncated:
+            done = True
+
+        # 更改一下reward
+        print(info)
+        return obs_, reward, done, info
+
+    def render(self):
+        self.env.render()
+
+
 class Env:
     def __init__(self, args):
         # 创建环境
@@ -82,6 +114,9 @@ class Env:
         elif args.scenario_name in ['simple']:
             from mpe.make_env import make_env
             self.env = MpeEnv(args)
+
+        elif args.scenario_name in ['forklift']:
+            self.env = ForkliftEnv()
         else:
             raise ValueError(f"{args.scenario_name} 不在给定环境中")
 

@@ -16,14 +16,9 @@ class Agent:
             from modules.replay_buffer import Buffer
             self.policy = DDPG(args)
             self.buffer = Buffer(args)
-        elif self.policy_type == 'DQN':
-            from policy.DQN import DQN
-            from modules.replay_buffer import Buffer
-            self.policy = DQN(args)
-            self.buffer = Buffer(args)
         elif self.policy_type == 'PPO':
-            from modules.online_replay_buffer import Buffer
             from policy.PPO import PPO
+            from modules.online_replay_buffer import Buffer
             self.buffer = Buffer(args)
             self.policy = PPO(args)
             self.update_nums = args.update_nums

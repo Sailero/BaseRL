@@ -19,6 +19,12 @@ class DDPG:
         # Record the important attributes
         self.device = args.device  # 设备信息
 
+        # import network
+        if len(args.agent_obs_dim) == 2:
+            from modules.actor_critic_2d import Actor, Critic
+        else:
+            from modules.actor_critic import Actor, Critic
+
         # create the network
         self.actor_network = Actor(args, 'actor').to(self.device)
         self.critic_network = Critic(args, 'critic').to(self.device)

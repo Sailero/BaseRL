@@ -74,6 +74,9 @@ class Runner:
 
             # 2.2 开始episode内的迭代
             for step in range(self.max_episode_len):
+                # # 2.2.0 显示训练过程
+                # self.env.render()
+
                 # 2.2.1 智能体选择动作
                 action = self.agent.choose_action(obs)
 

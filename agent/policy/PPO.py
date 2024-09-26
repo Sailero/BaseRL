@@ -1,6 +1,4 @@
 import torch
-from modules.online_replay_buffer import Buffer
-from modules.online_actor_critic import Actor, Critic
 import numpy as np
 
 class PPO:
@@ -20,6 +18,12 @@ class PPO:
         self.update_nums = args.update_nums
         self.ent_coef = args.ent_coef  # entropy coefficient
         self.value_loss_coef = args.value_loss_coef
+
+        # import network
+        if len(args.agent_obs_dim) == 2:
+            from modules.online_actor_critic_2d import Actor, Critic
+        else:
+            from modules.online_actor_critic import Actor, Critic
 
         # create the network
         self.actor_network = Actor(args, 'actor').to(self.device)
