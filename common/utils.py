@@ -2,7 +2,7 @@ import torch
 import os
 import pandas as pd
 import matplotlib.pyplot as plt
-
+import numpy as np
 
 def smooth(data, weight=0.96):
     sm_val = data[0]
@@ -39,6 +39,30 @@ def plot_returns_curves(agent_returns, plt_save_path):
     plt.close()
 
 
+def save_expert_data(expert_path, file_name, expert_data):
+    # 确保expert_data为numpy数组，以便处理多维数据
+    expert_data = np.array(expert_data)
+
+    # 确保expert_path存在
+    os.makedirs(expert_path, exist_ok=True)
+    file_path = os.path.join(expert_path, f"{file_name}.npy")
+
+    if os.path.exists(file_path):
+        # 如果文件存在，则加载已有数据并进行拼接
+        existing_data = np.load(file_path)
+
+        # 进行拼接，假设数据在第0维进行拼接
+        combined_data = np.concatenate((existing_data, expert_data), axis=0)
+
+        # 保存拼接后的数据
+        np.save(file_path, combined_data)
+    else:
+        # 如果文件不存在，则直接保存expert_data
+        np.save(file_path, expert_data)
+
+    print(f"Data has been saved or appended to {file_path}.")
+
+
 def make_env(args):
     # 创建环境
     from env.env import Env
@@ -54,6 +78,7 @@ def make_env(args):
 
     # 获取训练中的保存路径
     args.save_path = os.path.join(args.save_dir, args.scenario_name)
+    args.imitation_learning_path = os.path.join(args.save_dir, 'expert_data')
 
     # 获取训练的device
     args.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

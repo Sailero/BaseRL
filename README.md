@@ -38,3 +38,26 @@ runner：
     st_runner：PPO的主要运行逻辑类   
 
 main：运行主函数
+
+# 环境
+
+## poetry
+推荐使用 poetry 管理 python 项目，可以很方便的管理依赖，环境。
+[poetry 使用说明](https://blog.kyomind.tw/python-poetry/)
+
+环境安装：
+
+```bash
+poetry install
+```
+
+## 运行
+
+```bash
+# 进入 poetry 环境
+poetry shell
+
+# 运行 main.py
+python main.py
+```
+

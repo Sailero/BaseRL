@@ -21,9 +21,9 @@ class PPO:
 
         # import network
         if len(args.agent_obs_dim) == 2:
-            from modules.online_actor_critic_2d import Actor, Critic
+            from agent.modules.online_actor_critic_2d import Actor, Critic
         else:
-            from modules.online_actor_critic import Actor, Critic
+            from agent.modules.online_actor_critic import Actor, Critic
 
         # create the network
         self.actor_network = Actor(args, 'actor').to(self.device)
@@ -98,7 +98,9 @@ class PPO:
                     batch_old_log_prob = old_pi.log_prob(batch_action).sum(-1, keepdim=True)
 
                 # Calculate new log probs
+                print(batch_obs)
                 pi_mu, pi_std = self.actor_network(batch_obs)
+                print(pi_mu)
                 dist = torch.distributions.Normal(pi_mu, pi_std)
                 batch_new_log_prob = dist.log_prob(batch_action).sum(-1, keepdim=True)
 

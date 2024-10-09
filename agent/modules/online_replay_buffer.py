@@ -5,6 +5,8 @@ class Buffer:
     def __init__(self, args):
         # Initialize the arguments parameters
         self.buffer_size = args.st_buffer_size
+        self.imitation_buffer_size = args.buffer_size
+        self.imitation_learning = args.imitation_learning
         self.agent_obs_dim = args.agent_obs_dim
         self.agent_action_dim = args.agent_action_dim
 
@@ -23,11 +25,14 @@ class Buffer:
     def sample(self):
         sample_buffer = {}
         batch_id = np.arange(self.store_i)
-        for key in self.buffer.keys():
-            sample_buffer[key] = self.buffer[key][batch_id]
+        if self.imitation_learning:
+            for key in self.imitation_buffer.keys():
+                sample_buffer[key] = self.imitation_buffer[key][batch_id]
+        else:
+            for key in self.buffer.keys():
+                sample_buffer[key] = self.buffer[key][batch_id]
 
         return sample_buffer
-
 
     def ready(self):
         if self.store_i < self.buffer_size:
@@ -48,4 +53,14 @@ class Buffer:
         self.buffer['action'] = np.zeros([self.buffer_size, self.agent_action_dim])
         self.buffer['next_obs'] = np.zeros([self.buffer_size] + obs_dim)
 
+    def load_buffer(self, load_obs, load_action, load_reward, load_next_obs, load_done):
+        # Initial buffer
+        self.imitation_buffer = dict()
 
+        self.imitation_buffer['obs'] = load_obs
+        self.imitation_buffer['action'] = load_action
+        self.imitation_buffer['reward'] = load_reward
+        self.imitation_buffer['next_obs'] = load_next_obs
+        self.imitation_buffer['done'] = load_done
+
+        self.store_i = len(load_obs)

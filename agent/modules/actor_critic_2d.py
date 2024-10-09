@@ -1,7 +1,8 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from modules.base_network import ChkptModule
+from agent.modules.base_network import ChkptModule
+
 
 # define the actor network with pooling layers
 class Actor(ChkptModule):
@@ -84,7 +85,7 @@ class Critic(ChkptModule):
 
         # Fully connected layers
         self.fc1 = nn.Linear(conv_out_size, args.critic_hidden_dim)
-        self.fc2 = nn.Linear(args.critic_hidden_dim, args.critic_hidden_dim)
+        self.fc2 = nn.Linear(args.critic_hidden_dim + args.agent_action_dim, args.critic_hidden_dim)
         self.q_out = nn.Linear(args.critic_hidden_dim, 1)
 
         # Initialize weights
@@ -102,7 +103,7 @@ class Critic(ChkptModule):
         o = self.pool4(self.conv4(o))
         return int(torch.prod(torch.tensor(o.shape[1:])))
 
-    def forward(self, state):
+    def forward(self, state, action):
         # state is expected to be [batch_size, channels, height, width]
         state = state.unsqueeze(1)
         x = F.relu(self.conv1(state))
@@ -117,8 +118,10 @@ class Critic(ChkptModule):
         # Flatten the conv output
         x = x.view(x.size(0), -1)  # Flatten to [batch_size, conv_out_size]
 
+
         # Pass through fully connected layers
         x = F.relu(self.fc1(x))
+        x = torch.cat([x, action], dim=1)
         x = F.relu(self.fc2(x))
 
         q_value = self.q_out(x)

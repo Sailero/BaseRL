@@ -75,7 +75,7 @@ class MpeEnv:
 
 class ForkliftEnv:
     def __init__(self):
-        from forklift.isaac_sim_env_client import IsaacSimEnvClient
+        from env.forklift.isaac_sim_env_client import IsaacSimEnvClient
         self.env = IsaacSimEnvClient()
 
         self.agent_obs_dim = list(self.env.observation_space)
@@ -88,7 +88,7 @@ class ForkliftEnv:
 
     def reset(self):
         obs, info = self.env.reset()
-        return obs
+        return obs / 255
 
     def step(self, action):
         action = np.array(action)
@@ -97,9 +97,7 @@ class ForkliftEnv:
         if terminated or truncated:
             done = True
 
-        # 更改一下reward
-        print(info)
-        return obs_, reward, done, info
+        return obs_ / 255, reward, done, info
 
     def render(self):
         self.env.render()

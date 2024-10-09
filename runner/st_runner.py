@@ -24,6 +24,8 @@ class Runner:
         self.max_episode_len = args.max_episode_len
         self.train_episodes = args.train_episodes
         self.compare_path = args.save_path
+        self.expert_path = args.imitation_learning_path
+        self.imitation_training_nums = args.imitation_training_nums
         args.save_path = os.path.join(args.save_path, f"{args.policy_type}")
 
         self.plt_save_path = os.path.join(args.save_path, 'plt_results')
@@ -47,6 +49,23 @@ class Runner:
             os.makedirs(self.plt_save_path)
         if not os.path.exists(self.data_save_path):
             os.makedirs(self.data_save_path)
+        if not os.path.exists(self.expert_path):
+            os.makedirs(self.expert_path)
+
+    def imitation_learning(self):
+        # 每列为obs, action, reward, obs_, done
+        expert_obs = np.load(self.expert_path + '/expert_obs.npy')
+        expert_action = np.load(self.expert_path + '/expert_action.npy')
+        expert_reward = np.load(self.expert_path + '/expert_reward.npy').reshape([-1, 1])
+        expert_next_obs = np.load(self.expert_path + '/expert_next_obs.npy')
+        expert_done = np.load(self.expert_path + '/expert_done.npy').reshape([-1, 1])
+
+        self.agent.buffer.load_buffer(expert_obs, expert_action, expert_reward, expert_next_obs, expert_done)
+
+        for _ in tqdm(range(self.imitation_training_nums)):
+            self.agent.train()
+
+        self.agent.save_checkpoint()
 
     def run(self):
         # 1. 训练准备
@@ -123,18 +142,17 @@ class Runner:
                 # 保存奖励数据
                 save_data(self.data_save_path, game_results, csv_name="game_results", column_name=['GameResults'])
                 save_data(self.data_save_path, agent_returns, csv_name="agent_returns", column_name=["ReturnsForAgent"])
-                save_data(self.data_save_path, train_episode_step, csv_name="train_episode_step", column_name=['EachEpisodeSteps'])
+                save_data(self.data_save_path, train_episode_step, csv_name="train_episode_step",
+                          column_name=['EachEpisodeSteps'])
 
                 # 2.5 每100个回合记录训练曲线
                 plot_returns_curves(agent_returns, self.plt_save_path)
-
 
                 # 2.6 打印训练信息
                 print()
                 print('episode', episode + 1)
                 print('\naverage episode steps', np.mean(train_episode_step[-self.display_episodes:]))
                 print('agent average returns {:.1f}'.format(avg_agent_returns))
-
 
         # 3.1 当训练完成时，保存模型
         if self.save_last_model:
@@ -235,8 +253,6 @@ class Runner:
                 plt.xlabel('episode')
                 plt.ylabel(f'{name}')
 
-
-
                 # 获取图片保存地址
                 path = os.path.join(compare_results_path, f'compare_{name}.png')
                 plt.savefig(path, format='png')
@@ -244,13 +260,6 @@ class Runner:
                 plt.close()
                 print(f'Different policies {name} figure is saved')
 
-
         plot_data(game_results, 'game_results')
         plot_data(agent_returns, 'agent_returns')
         plot_data(train_episode_step, 'train_episode_step')
-
-
-
-
-
-

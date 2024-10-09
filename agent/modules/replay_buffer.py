@@ -51,4 +51,12 @@ class Buffer:
         self.buffer['action'] = np.empty([self.buffer_size, self.agent_action_dim])
         self.buffer['next_obs'] = np.zeros([self.buffer_size] + obs_dim)
 
+    def load_buffer(self, load_obs, load_action, load_reward, load_next_obs, load_done):
+        self.buffer['obs'][:len(load_obs)] = load_obs
+        self.buffer['action'][:len(load_action)] = load_action
+        self.buffer['reward'][:len(load_reward)] = load_reward
+        self.buffer['next_obs'][:len(load_next_obs)] = load_next_obs
+        self.buffer['done'][:len(load_done)] = load_done
 
+        self.current_size = min(len(load_obs), self.buffer_size)
+        self.store_i = self.current_size

@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from modules.base_network import ChkptModule
+from agent.modules.base_network import ChkptModule
 
 
 # define the actor network
@@ -63,4 +63,3 @@ class Critic(ChkptModule):
         x = F.relu(self.fc2(x))
         q_value = self.q_out(x)
         return q_value
-

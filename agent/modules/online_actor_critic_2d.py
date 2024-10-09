@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from modules.base_network import ChkptModule
+from agent.modules.base_network import ChkptModule
 
 # define the actor network with pooling layers
 class Actor(ChkptModule):
@@ -46,8 +46,13 @@ class Actor(ChkptModule):
     def forward(self, x):
         # x is expected to be [batch_size, channels, height, width]
         x = x.unsqueeze(1)
+        print('max1', torch.max(x))
+        print("isnan", torch.isnan(x).any())
         x = F.relu(self.conv1(x))
+        print(x)
+        print('max2', torch.max(x))
         x = self.pool1(x)  # Max pooling after activation
+
         x = F.relu(self.conv2(x))
         x = self.pool2(x)  # Max pooling after activation
         x = F.relu(self.conv3(x))

@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/Forklift-Project.iml" filepath="$PROJECT_DIR$/.idea/Forklift-Project.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/Forklift.iml" filepath="$PROJECT_DIR$/.idea/Forklift.iml" />
     </modules>
   </component>
 </project>

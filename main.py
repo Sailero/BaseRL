@@ -2,7 +2,6 @@ from common.arguments import get_args
 from common.utils import make_env
 import torch
 
-
 if __name__ == '__main__':
     # get the params
     args = get_args()
@@ -20,6 +19,8 @@ if __name__ == '__main__':
         runner.evaluate()
     elif args.compare:
         runner.compare_models_curves()
+    elif args.imitation_learning:
+        runner.imitation_learning()
     else:
         runner.run()
         if torch.cuda.is_available():
