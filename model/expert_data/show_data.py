@@ -1,11 +1,11 @@
 import numpy as np
 
 
-obs = np.load("expert_obs.npy")
-action = np.load("expert_action.npy")
-reward = np.load("expert_reward.npy")
-obs_ = np.load("expert_next_obs.npy")
-done = np.load("expert_done.npy")
+obs = np.load("../MPE expert data/expert_obs.npy")
+action = np.load("../MPE expert data/expert_action.npy")
+reward = np.load("../MPE expert data/expert_reward.npy")
+obs_ = np.load("../MPE expert data/expert_next_obs.npy")
+done = np.load("../MPE expert data/expert_done.npy")
 
 def check_nan_inf(obs):
     if np.isnan(obs).any():
@@ -22,4 +22,10 @@ def check_value_range(obs, min_threshold=-1e5, max_threshold=1e5):
         return True
     return False
 
-print(np.min(obs))
+print(obs)
+print(action)
+print(obs_)
+print(reward)
+print(done)
+print(np.sum(done))
+

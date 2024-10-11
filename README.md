@@ -13,6 +13,11 @@ compare：如果为True，会收集所有算法的训练数据并绘制训练曲
 evaluate：如果为False则为训练状态；如果为True则为可视化展示状态。   
 display-episodes：每隔display-episodes会print过去的平均reward，并检测训练效果是否提升，如果提升则保存当前模型到model中。
 
+#### 10.12补充
+./model/MPE expert data：是测试MPE环境中模仿学习是否有效的数据。
+./model/expert data：是模型读取专家数据的路径区域。数据存储格式是.npy
+imitation-learning：是否进行模仿学习的接口。
+
 其他参数相对而言没有那么重要，或者对于大体训练流程与效果并不敏感。
 
 
@@ -61,3 +66,6 @@ poetry shell
 python main.py
 ```
 
+# 问题
+1. 环境结束的判定有问题
+2. 模仿学习逻辑可能有问题，DDPG完全不能够训练，PPO训练效果差。算法没有什么问题

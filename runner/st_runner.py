@@ -60,12 +60,16 @@ class Runner:
         expert_next_obs = np.load(self.expert_path + '/expert_next_obs.npy')
         expert_done = np.load(self.expert_path + '/expert_done.npy').reshape([-1, 1])
 
+        print("sample data nums:", len(expert_obs))
+
         self.agent.buffer.load_buffer(expert_obs, expert_action, expert_reward, expert_next_obs, expert_done)
 
         for _ in tqdm(range(self.imitation_training_nums)):
             self.agent.train()
 
         self.agent.save_checkpoint()
+
+        self.evaluate()
 
     def run(self):
         # 1. 训练准备
@@ -165,6 +169,13 @@ class Runner:
         # 加载预训练的模型
         self.agent.load_checkpoint()
 
+        # 临时的保存数据窗口
+        from common.utils import save_expert_data
+        expert_obs_list, expert_action_list, expert_reward_list, expert_next_obs_list, expert_done_list = [], [], [], [], []
+        expert_path = "./model/expert_data"
+        if not os.path.exists(expert_path):
+            os.makedirs(expert_path)
+
         # 初始化奖励
         agent_returns = []
         game_results = []
@@ -190,6 +201,16 @@ class Runner:
                 with torch.no_grad():
                     obs_, reward, done, info = self.env.step(action)
 
+                    if step == self.max_episode_len - 1:
+                        done = True
+
+                    # 保存专家数据
+                    expert_obs_list.append(obs)
+                    expert_action_list.append(action)
+                    expert_reward_list.append(reward)
+                    expert_next_obs_list.append(obs_)
+                    expert_done_list.append(done)
+
                 # 更新信息
                 obs = obs_
 
@@ -204,7 +225,14 @@ class Runner:
             game_results.append(done)
 
             # 增加对局奖励记录
+            print(f"episode {episode}'s episode_reward:f{agent_episode_reward}")
             agent_returns.append(agent_episode_reward)
+
+        # save_expert_data(expert_path, "expert_obs", expert_obs_list)
+        # save_expert_data(expert_path, "expert_action", expert_action_list)
+        # save_expert_data(expert_path, "expert_reward", expert_reward_list)
+        # save_expert_data(expert_path, "expert_next_obs", expert_next_obs_list)
+        # save_expert_data(expert_path, "expert_done", expert_done_list)
 
         # 打印相关信息
         print(f"The probability of finishing the task is {np.sum(game_results) / len(game_results) * 100}%")

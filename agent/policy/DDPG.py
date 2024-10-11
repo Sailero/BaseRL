@@ -19,10 +19,10 @@ class DDPG:
         self.device = args.device  # 设备信息
 
         # import network
-        if len(args.agent_obs_dim) == 2:
-            from agent.modules.actor_critic_2d import Actor, Critic
-        else:
+        if isinstance(args.agent_obs_dim, int):
             from agent.modules.actor_critic import Actor, Critic
+        else:
+            from agent.modules.actor_critic_2d import Actor, Critic
 
         # create the network
         self.actor_network = Actor(args, 'actor').to(self.device)
@@ -76,16 +76,18 @@ class DDPG:
         # update the network
         self.actor_optim.zero_grad()
         actor_loss.backward()
+        # torch.nn.utils.clip_grad_norm_(self.actor_network.parameters(), 0.5)
         self.actor_optim.step()
 
         self.critic_optim.zero_grad()
         critic_loss.backward()
+        # torch.nn.utils.clip_grad_norm_(self.critic_network.parameters(), 0.5)
         self.critic_optim.step()
 
         print("\nactor_loss:", actor_loss)
         print("critic_loss", critic_loss)
-        print("batch_action:", batch_action)
-        print("batch_online_action:", batch_online_action)
+        # print("batch_action:", batch_action)
+        print("batch_online_action:", batch_online_action[0])
 
         self._soft_update_target_network()
 

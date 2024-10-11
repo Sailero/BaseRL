@@ -20,10 +20,10 @@ class PPO:
         self.value_loss_coef = args.value_loss_coef
 
         # import network
-        if len(args.agent_obs_dim) == 2:
-            from agent.modules.online_actor_critic_2d import Actor, Critic
-        else:
+        if isinstance(args.agent_obs_dim, int):
             from agent.modules.online_actor_critic import Actor, Critic
+        else:
+            from agent.modules.online_actor_critic_2d import Actor, Critic
 
         # create the network
         self.actor_network = Actor(args, 'actor').to(self.device)
@@ -39,13 +39,13 @@ class PPO:
 
     # GAE (Generalized Advantage Estimation)
     def compute_gae(self, rewards, values, next_values, dones):
-        advantages = []
+        advantages = np.zeros(len(values))
         advantage = 0
         for t in reversed(range(len(rewards))):
             # 这里next_value和values都是length长度的列表or数组。其中next_value为value[1:]，values是value[:-1]
             delta = rewards[t] + self.gamma * next_values[t] * (1 - int(dones[t])) - values[t]
             advantage = delta + self.gamma * self.lam * advantage * (1 - int(dones[t]))
-            advantages.insert(0, advantage)
+            advantages[t] = advantage
         return advantages
 
     # update the network
@@ -98,9 +98,7 @@ class PPO:
                     batch_old_log_prob = old_pi.log_prob(batch_action).sum(-1, keepdim=True)
 
                 # Calculate new log probs
-                print(batch_obs)
                 pi_mu, pi_std = self.actor_network(batch_obs)
-                print(pi_mu)
                 dist = torch.distributions.Normal(pi_mu, pi_std)
                 batch_new_log_prob = dist.log_prob(batch_action).sum(-1, keepdim=True)
 

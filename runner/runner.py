@@ -60,6 +60,8 @@ class Runner:
         expert_next_obs = np.load(self.expert_path + '/expert_next_obs.npy')
         expert_done = np.load(self.expert_path + '/expert_done.npy').reshape([-1, 1])
 
+        print("sample data nums:", len(expert_obs))
+
         self.agent.buffer.load_buffer(expert_obs, expert_action, expert_reward, expert_next_obs, expert_done)
 
         for _ in tqdm(range(self.imitation_training_nums)):
@@ -84,6 +86,8 @@ class Runner:
         # 是否加载先前训练的模型
         if self.load_pre_model:
             self.agent.load_checkpoint()
+
+        # self.imitation_learning()
 
         # 2. 开始训练
         train_step = 0
@@ -111,7 +115,7 @@ class Runner:
                 train_step += 1
 
                 # 2.2.5 智能体训练，每隔10步训练一次
-                if self.agent.buffer.ready() and train_step % 10 == 0:
+                if self.agent.buffer.ready():
                     self.agent.train()
 
                 # 2.2.6 记录对局reward
@@ -162,6 +166,13 @@ class Runner:
         # 加载预训练的模型
         self.agent.load_checkpoint()
 
+        # 临时的保存数据窗口
+        from common.utils import save_expert_data
+        expert_obs_list, expert_action_list, expert_reward_list, expert_next_obs_list, expert_done_list = [], [], [], [], []
+        expert_path = "./model/expert_data"
+        if not os.path.exists(expert_path):
+            os.makedirs(expert_path)
+
         # 初始化奖励
         agent_returns = []
         game_results = []
@@ -177,8 +188,8 @@ class Runner:
             # 对于episode中的步数进行迭代
             for step in range(self.max_episode_len):
                 # 可视化展示
-                self.env.render()
-                time.sleep(0.08)
+                # self.env.render()
+                # time.sleep(0.02)
 
                 # 智能体选择动作
                 action = self.agent.choose_action(obs)
@@ -186,6 +197,13 @@ class Runner:
                 # 更新状态
                 with torch.no_grad():
                     obs_, reward, done, info = self.env.step(action)
+
+                # 保存专家数据
+                expert_obs_list.append(obs)
+                expert_action_list.append(action)
+                expert_reward_list.append(reward)
+                expert_next_obs_list.append(obs_)
+                expert_done_list.append(done)
 
                 # 更新信息
                 obs = obs_
@@ -202,6 +220,12 @@ class Runner:
 
             # 增加对局奖励记录
             agent_returns.append(agent_episode_reward)
+
+        save_expert_data(expert_path, "expert_obs", expert_obs_list)
+        save_expert_data(expert_path, "expert_action", expert_action_list)
+        save_expert_data(expert_path, "expert_reward", expert_reward_list)
+        save_expert_data(expert_path, "expert_next_obs", expert_next_obs_list)
+        save_expert_data(expert_path, "expert_done", expert_done_list)
 
         # 打印相关信息
         print(f"The probability of finishing the task is {np.sum(game_results) / len(game_results) * 100}%")

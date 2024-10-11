@@ -81,7 +81,7 @@ class ForkliftEnv:
         self.agent_obs_dim = list(self.env.observation_space)
         self.agent_action_dim = self.env.action_space[0]
 
-        self.action_low = 0
+        self.action_low = -1
         self.action_high = 1
 
         self.max_episode_len = 200
@@ -97,7 +97,7 @@ class ForkliftEnv:
         if terminated or truncated:
             done = True
 
-        return obs_ / 255, reward, done, info
+        return obs_ / 255, reward / 100, done, info
 
     def render(self):
         self.env.render()
