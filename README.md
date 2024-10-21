@@ -14,9 +14,14 @@ evaluate：如果为False则为训练状态；如果为True则为可视化展示
 display-episodes：每隔display-episodes会print过去的平均reward，并检测训练效果是否提升，如果提升则保存当前模型到model中。
 
 #### 10.12补充
-./model/MPE expert data：是测试MPE环境中模仿学习是否有效的数据。
-./model/expert data：是模型读取专家数据的路径区域。数据存储格式是.npy
-imitation-learning：是否进行模仿学习的接口。
+./model/MPE expert data：是测试MPE环境中模仿学习是否有效的数据。  
+./model/expert data：是模型读取专家数据的路径区域。数据存储格式是.npy。当前里面的数据是MPE的expert data  
+imitation-learning：是否进行模仿学习的接口。在完成模仿学习之后，会自动进行evaluate  
+imitation-training-nums：模仿学习训练的次数。每一次训练都是让buffer采样以此后扔给train函数进行训练。因此训练时可能会微调算法训练参数。  
+forklift_expert_sample.py：是采集叉车专家数据的程序，独立运行。可以自动将数据存储到./model/expert data中。
+                           考虑到会多次采样数据，这里的数据累计采集的。只要不手动删除，就会一直保留之前的数据。
+* 在模仿学习中，PPO暂时是拿所有的expert data进行训练，样本个数不等于st-buffer-size。因此训练会特别慢。这个还需要思考有没有改进的地方。
+* DDPG还无法模仿学习，存在bug。目前只能用PPO
 
 其他参数相对而言没有那么重要，或者对于大体训练流程与效果并不敏感。
 
@@ -66,6 +71,14 @@ poetry shell
 python main.py
 ```
 
-# 问题
-1. 环境结束的判定有问题
-2. 模仿学习逻辑可能有问题，DDPG完全不能够训练，PPO训练效果差。算法没有什么问题
+## 运行 tensorboard
+在项目根目录下
+
+```bash
+# 进入 poetry 环境
+poetry shell
+
+# 运行 tensorboard
+tensorboard --logdir=logs
+```
+

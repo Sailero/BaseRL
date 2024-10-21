@@ -28,7 +28,7 @@ def plot_returns_curves(agent_returns, plt_save_path):
     plt.plot(range(len(agent_returns)), smooth(agent_returns, weight=0.96), label='smooth',
              linewidth=0.5, alpha=1, c='blue')
     plt.legend()
-    plt.title(f'Forklift agent train returns')
+    plt.title(f'agent train returns')
     plt.xlabel('episode')
     plt.ylabel('each episode average return')
 
@@ -40,6 +40,10 @@ def plot_returns_curves(agent_returns, plt_save_path):
 
 
 def save_expert_data(expert_path, file_name, expert_data):
+    if len(expert_data) == 0:
+        print("data is empty, skip saving.")
+        return
+
     # 确保expert_data为numpy数组，以便处理多维数据
     expert_data = np.array(expert_data)
 
@@ -56,11 +60,11 @@ def save_expert_data(expert_path, file_name, expert_data):
 
         # 保存拼接后的数据
         np.save(file_path, combined_data)
+        print(f"Data has been saved or appended to {file_path}. len {len(expert_data)} -> {combined_data.shape}")
     else:
         # 如果文件不存在，则直接保存expert_data
         np.save(file_path, expert_data)
-
-    print(f"Data has been saved or appended to {file_path}.")
+        print(f"Data has been saved or appended to {file_path}. len: {len(expert_data)}")
 
 
 def make_env(args):
@@ -78,9 +82,10 @@ def make_env(args):
 
     # 获取训练中的保存路径
     args.save_path = os.path.join(args.save_dir, args.scenario_name)
-    args.imitation_learning_path = os.path.join(args.save_dir, 'expert_data')
+    args.expert_data_path = os.path.join("./expert_data", f"{args.scenario_name}")
 
     # 获取训练的device
+    os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_id
     args.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"\nUsing device: {args.device}")
 

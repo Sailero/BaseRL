@@ -1,25 +1,31 @@
+import torch
+
 from common.arguments import get_args
 from common.utils import make_env
-import torch
+from common.logger import Logger
 
 if __name__ == '__main__':
     # get the params
     args = get_args()
     env, args = make_env(args)
+    logger = Logger(args)
 
-    if args.policy_type in ['PPO']:
-        from runner.st_runner import Runner
+    # Initialize the runner
+    if args.policy_type in ['GAIL_PPO']:
+        from runner.gail_runner import GAILRunner
+        runner = GAILRunner(args, env, logger)
     else:
         from runner.runner import Runner
-    # Initialize the runner
-    runner = Runner(args, env)
+        runner = Runner(args, env, logger)
 
     # Execute
     if args.evaluate:
+        print("in evaluate mode!")
         runner.evaluate()
     elif args.compare:
         runner.compare_models_curves()
     elif args.imitation_learning:
+        print("in imitation learning mode!")
         runner.imitation_learning()
     else:
         runner.run()

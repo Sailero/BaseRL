@@ -1,7 +1,14 @@
-import torch
 import numpy as np
 
+import torch
+
+
+# from torch.utils.data.sampler import BatchSampler, SubsetRandomSampler
+
+
 class PPO:
+    name = 'PPO'
+
     def __init__(self, args):
         # Read the training parameters from args
         self.gamma = args.gamma
@@ -15,6 +22,7 @@ class PPO:
         # Special parameters of PPO
         self.lam = args.lam  # GAE lambda
         self.eps_clip = args.eps_clip
+        self.action_clip = args.action_clip
         self.update_nums = args.update_nums
         self.ent_coef = args.ent_coef  # entropy coefficient
         self.value_loss_coef = args.value_loss_coef
@@ -23,7 +31,7 @@ class PPO:
         if isinstance(args.agent_obs_dim, int):
             from agent.modules.online_actor_critic import Actor, Critic
         else:
-            from agent.modules.online_actor_critic_2d import Actor, Critic
+            from agent.modules.online_actor_critic_2d_shufflenet import Actor, Critic
 
         # create the network
         self.actor_network = Actor(args, 'actor').to(self.device)
@@ -33,9 +41,19 @@ class PPO:
         # load the parameters
         self.old_actor_network.load_state_dict(self.actor_network.state_dict())
 
-        # create the optimizer
-        self.actor_optim = torch.optim.Adam(self.actor_network.parameters(), lr=args.lr_actor)
-        self.critic_optim = torch.optim.Adam(self.critic_network.parameters(), lr=args.lr_critic)
+        # create the optimizer 可控制需要优化的参数
+        self.actor_optim = torch.optim.Adam(filter(lambda p: p.requires_grad, self.actor_network.parameters()),
+                                            lr=args.lr_actor)
+        self.critic_optim = torch.optim.Adam(filter(lambda p: p.requires_grad, self.critic_network.parameters()),
+                                             lr=args.lr_critic)
+
+        # 记录训练过程数据
+        self.train_record = dict()
+
+    def add_graph(self, obs, action, logger):
+        from agent.policy.wrapper import WrapperState2
+        wrapper = WrapperState2(self.actor_network, self.critic_network)
+        logger.add_graph(wrapper, obs)
 
     # GAE (Generalized Advantage Estimation)
     def compute_gae(self, rewards, values, next_values, dones):
@@ -52,7 +70,9 @@ class PPO:
     def train(self, transitions):
         # Transit tensor to gpu
         for key in transitions.keys():
-            transitions[key] = torch.tensor(transitions[key], dtype=torch.float32).to(self.device)
+            # 如果不是tensor，则转换为tensor
+            if not isinstance(transitions[key], torch.Tensor):
+                transitions[key] = torch.tensor(np.array(transitions[key]), dtype=torch.float32).to(self.device)
         trans_obs = transitions['obs']
         trans_action = transitions['action']
         trans_reward = transitions['reward']
@@ -62,7 +82,6 @@ class PPO:
 
         # Scale the reward
         trans_reward = (trans_reward - trans_reward.mean()) / (trans_reward.std() + 1e-6)
-
 
         # Load state dicts
         self.old_actor_network.load_state_dict(self.actor_network.state_dict())
@@ -83,8 +102,8 @@ class PPO:
             buffer_indices = np.arange(trans_len)
             np.random.shuffle(buffer_indices)
             batch_id_set = [buffer_indices[i: i + self.batch_size] for i in batch_start_points]
-
             for batch_ids in batch_id_set:
+                # for batch_ids in BatchSampler(SubsetRandomSampler(range(trans_len)), self.batch_size, False):
                 # Get sampling data
                 batch_obs = trans_obs[batch_ids]
                 batch_action = trans_action[batch_ids]
@@ -110,12 +129,14 @@ class PPO:
                 surr2 = torch.clamp(ratio, 1 - self.eps_clip, 1 + self.eps_clip) * batch_advantages
 
                 # Add entropy to encourage exploration
-                entropy = dist.entropy().mean()
-                actor_loss = -torch.min(surr1, surr2).mean()  #  - self.ent_coef * entropy
+                # entropy = dist.entropy().mean()
+                actor_loss = -torch.min(surr1, surr2).mean()  # - self.ent_coef * entropy
+                self.train_record[self.name + '/actor_loss'] = actor_loss.item()
 
                 # Critic update
                 gae_value = self.critic_network(batch_obs)
                 critic_loss = (batch_returns - gae_value).pow(2).mean()
+                self.train_record[self.name + '/critic_loss'] = critic_loss.item()
 
                 # print()
                 # print('actor_loss', actor_loss)
@@ -138,10 +159,10 @@ class PPO:
                 self.actor_optim.step()
                 self.critic_optim.step()
 
-
     def choose_action(self, observation):
         # Choose action based on actor network
-        inputs = torch.tensor(observation, dtype=torch.float32).unsqueeze(0).to(self.device)
+        # inputs = torch.tensor(observation, dtype=torch.float32).unsqueeze(0).to(self.device)
+        inputs = observation.clone().detach().unsqueeze(0).to(self.device)
         with torch.no_grad():
             pi_mu, pi_std = self.actor_network(inputs)
             pi_mu, pi_std = pi_mu.reshape(-1), pi_std.reshape(-1)
@@ -150,7 +171,7 @@ class PPO:
         action = dist.sample()
         action = action.cpu().detach().numpy()
 
-        action = np.clip(action, -1, 1)
+        action = np.clip(action, -self.action_clip, self.action_clip)
         return action.tolist()
 
     def save_models(self):
@@ -160,4 +181,3 @@ class PPO:
     def load_models(self):
         self.actor_network.load_checkpoint()
         self.critic_network.load_checkpoint()
-

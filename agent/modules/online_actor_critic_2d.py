@@ -75,7 +75,7 @@ class Critic(ChkptModule):
 
         # Conv layers
         self.conv1 = nn.Conv2d(in_channels=1, out_channels=4, kernel_size=3, stride=1, padding=1)
-        self.pool1 = nn.MaxPool2d(kernel_size=2, stride=2)  # Max pooling layer
+        self.pool1 = nn.MaxPool2d(kernel_size=4, stride=4)  # Max pooling layer
         self.conv2 = nn.Conv2d(in_channels=4, out_channels=8, kernel_size=3, stride=1, padding=1)
         self.pool2 = nn.MaxPool2d(kernel_size=2, stride=2)  # Max pooling layer
         self.conv3 = nn.Conv2d(in_channels=8, out_channels=16, kernel_size=3, stride=1, padding=1)

@@ -1,2 +1,12 @@
 .idea
 __pycache__/
+
+# 忽略专家数据
+expert_data/*
+!expert_data/*.py
+
+# 忽略日志文件
+logs
+
+# 忽略训练的参数文件
+parameters/

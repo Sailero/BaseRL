@@ -4,6 +4,7 @@ import numpy as np
 class Buffer:
     def __init__(self, args):
         # Initialize the arguments parameters
+        self.buffer = None
         self.buffer_size = args.buffer_size
         self.agent_obs_dim = args.agent_obs_dim
         self.agent_action_dim = args.agent_action_dim
@@ -15,6 +16,9 @@ class Buffer:
 
         # Initialize the buffer
         self.initial_buffer()
+
+    def reset(self):
+        pass
 
     def store_episode(self, obs_n, action_n, reward, next_obs_n, done):
         self.buffer['reward'][self.store_i] = reward

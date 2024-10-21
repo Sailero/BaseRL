@@ -17,4 +17,4 @@ class ChkptModule(nn.Module):
         torch.save(self.state_dict(), self.chkpt_file)
 
     def load_checkpoint(self):
-        self.load_state_dict(torch.load(self.chkpt_file))
+        self.load_state_dict(torch.load(self.chkpt_file, weights_only=True))

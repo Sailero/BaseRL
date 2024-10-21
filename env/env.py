@@ -1,6 +1,7 @@
 import gym
 import numpy as np
 
+
 class GymEnv:
     def __init__(self, args):
         # 创建环境
@@ -22,7 +23,7 @@ class GymEnv:
             self.max_episode_len = self.env.spec.max_episode_steps
 
         else:
-            raise ValueError(f"{args.scenario_name} 不在给定环境中")
+            raise ValueError(f"{args.scenario_name} not supported")
 
     def reset(self):
         obs = self.env.reset()
@@ -36,6 +37,7 @@ class GymEnv:
 
     def render(self):
         self.env.render()
+
 
 class MpeEnv:
     def __init__(self, args):
@@ -56,7 +58,7 @@ class MpeEnv:
             self.max_episode_len = 25
 
         else:
-            raise ValueError(f"{args.scenario_name} 不在给定环境中")
+            raise ValueError(f"{args.scenario_name} not supported")
 
     def reset(self):
         obs = self.env.reset()
@@ -74,9 +76,9 @@ class MpeEnv:
 
 
 class ForkliftEnv:
-    def __init__(self):
+    def __init__(self, args):
         from env.forklift.isaac_sim_env_client import IsaacSimEnvClient
-        self.env = IsaacSimEnvClient()
+        self.env = IsaacSimEnvClient(pallet_random=args.pallet_random)
 
         self.agent_obs_dim = list(self.env.observation_space)
         self.agent_action_dim = self.env.action_space[0]
@@ -84,11 +86,11 @@ class ForkliftEnv:
         self.action_low = -1
         self.action_high = 1
 
-        self.max_episode_len = 200
+        self.max_episode_len = args.forklift_episode_len
 
     def reset(self):
         obs, info = self.env.reset()
-        return obs / 255
+        return obs / 255.
 
     def step(self, action):
         action = np.array(action)
@@ -97,7 +99,10 @@ class ForkliftEnv:
         if terminated or truncated:
             done = True
 
-        return obs_ / 255, reward / 100, done, info
+        info['terminated'] = terminated
+        info['truncated'] = truncated
+
+        return obs_ / 255., reward / 100., done, info
 
     def render(self):
         self.env.render()
@@ -114,9 +119,9 @@ class Env:
             self.env = MpeEnv(args)
 
         elif args.scenario_name in ['forklift']:
-            self.env = ForkliftEnv()
+            self.env = ForkliftEnv(args)
         else:
-            raise ValueError(f"{args.scenario_name} 不在给定环境中")
+            raise ValueError(f"{args.scenario_name} not supported")
 
         # 获取观测信息
         self.agent_obs_dim = self.env.agent_obs_dim
@@ -139,4 +144,3 @@ class Env:
 
     def render(self):
         self.env.render()
-

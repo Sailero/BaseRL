@@ -1,7 +1,6 @@
 from tqdm import tqdm
 import numpy as np
 import time
-import torch
 import os
 import pandas as pd
 
@@ -15,17 +14,18 @@ from common.utils import smooth, save_data, plot_returns_curves
 
 
 class Runner:
-    def __init__(self, args, env):
+    def __init__(self, args, env, logger):
+        self.logger = logger
         # 加载环境
         self.env = env
         self.device = args.device
 
         # 加载args中训练有关参数
+        self.render = args.render
         self.max_episode_len = args.max_episode_len
         self.train_episodes = args.train_episodes
         self.compare_path = args.save_path
-        self.expert_path = args.imitation_learning_path
-        self.imitation_training_nums = args.imitation_training_nums
+        self.expert_data_path = args.expert_data_path
         args.save_path = os.path.join(args.save_path, f"{args.policy_type}")
 
         self.plt_save_path = os.path.join(args.save_path, 'plt_results')
@@ -41,6 +41,12 @@ class Runner:
         self.is_evaluated = args.evaluate
         self.evaluate_episodes = args.evaluate_episodes
         self.display_episodes = args.display_episodes
+        self.force_save_model = args.force_save_model
+
+        # 训练相关
+        # 初始化最大奖励
+        self.best_agent_return = -1e5
+        self.best_episodes = 0
 
         # 创建保存路径
         if not os.path.exists(args.save_path):
@@ -49,28 +55,60 @@ class Runner:
             os.makedirs(self.plt_save_path)
         if not os.path.exists(self.data_save_path):
             os.makedirs(self.data_save_path)
-        if not os.path.exists(self.expert_path):
-            os.makedirs(self.expert_path)
+        if not os.path.exists(self.expert_data_path):
+            os.makedirs(self.expert_data_path)
 
-    def imitation_learning(self):
-        # 每列为obs, action, reward, obs_, done
-        expert_obs = np.load(self.expert_path + '/expert_obs.npy')
-        expert_action = np.load(self.expert_path + '/expert_action.npy')
-        expert_reward = np.load(self.expert_path + '/expert_reward.npy').reshape([-1, 1])
-        expert_next_obs = np.load(self.expert_path + '/expert_next_obs.npy')
-        expert_done = np.load(self.expert_path + '/expert_done.npy').reshape([-1, 1])
+    def load_expert_data(self):
+        # 加载专家数据
+        expert_obs = np.load(self.expert_data_path + '/expert_obs.npy')
+        expert_action = np.load(self.expert_data_path + '/expert_action.npy')
+        expert_reward = np.load(self.expert_data_path + '/expert_reward.npy').reshape([-1, 1])
+        expert_next_obs = np.load(self.expert_data_path + '/expert_next_obs.npy')
+        expert_done = np.load(self.expert_data_path + '/expert_done.npy').reshape([-1, 1])
 
         print("sample data nums:", len(expert_obs))
+        print("obs shape", expert_obs.shape)
+        print("action shape", expert_action.shape)
 
         self.agent.buffer.load_buffer(expert_obs, expert_action, expert_reward, expert_next_obs, expert_done)
 
-        for _ in tqdm(range(self.imitation_training_nums)):
-            self.agent.train()
+    def imitation_learning(self):
+        self.load_expert_data()
 
-        self.agent.save_checkpoint()
+        for num in tqdm(range(self.train_episodes)):
+            self.agent.train(num, self.logger)
+
+        self.agent.save_models()
 
         self.evaluate()
 
+    def save_run_data(self, episode, agent_returns, game_results, train_episode_step):
+        avg_agent_returns = np.mean(agent_returns[-self.display_episodes:])
+        if avg_agent_returns > self.best_agent_return:
+            self.agent.save_models()
+
+            self.best_agent_return = avg_agent_returns
+            self.best_episodes = episode
+            print(
+                f"The reward is the most of the history when episode is {episode + 1}, "
+                f"best_agent_return is {self.best_agent_return}")
+        elif self.force_save_model:
+            self.agent.save_models()
+
+        # 保存奖励数据
+        save_data(self.data_save_path, game_results, csv_name="game_results", column_name=['GameResults'])
+        save_data(self.data_save_path, agent_returns, csv_name="agent_returns", column_name=["ReturnsForAgent"])
+        save_data(self.data_save_path, train_episode_step, csv_name="train_episode_step",
+                  column_name=['EachEpisodeSteps'])
+
+        # 2.5 每100个回合记录训练曲线
+        plot_returns_curves(agent_returns, self.plt_save_path)
+
+        # 2.6 打印训练信息
+        print()
+        print('episode', episode + 1)
+        print('\naverage episode steps', np.mean(train_episode_step[-self.display_episodes:]))
+        print('agent average returns {:.1f}'.format(avg_agent_returns))
 
     def run(self):
         # 1. 训练准备
@@ -78,45 +116,50 @@ class Runner:
         agent_returns = []
         game_results = []
         train_episode_step = []
-
-        # 初始化最大奖励
-        best_agent_return = -1e5
-        best_episodes = 0
+        terminated = None
 
         # 是否加载先前训练的模型
         if self.load_pre_model:
-            self.agent.load_checkpoint()
-
-        # self.imitation_learning()
+            self.agent.load_models()
 
         # 2. 开始训练
-        train_step = 0
         for episode in tqdm(range(self.train_episodes)):
             # 2.1 初始化环境
             obs = self.env.reset()
 
             # 记录对局reward
             agent_episode_reward = 0
+            done = False
+            step = 0
+            self.agent.buffer.reset()
 
             # 2.2 开始episode内的迭代
             for step in range(self.max_episode_len):
+                # 2.2.0 显示训练过程
+                if self.render:
+                    self.env.render()
+                    time.sleep(0.01)
+
                 # 2.2.1 智能体选择动作
                 action = self.agent.choose_action(obs)
 
                 # 2.2.2 智能体更新状态
-                with torch.no_grad():
-                    obs_, reward, done, info = self.env.step(action)
+                next_obs, reward, done, info = self.env.step(action)
+                if 'terminated' in info:
+                    terminated = info['terminated']
 
-                    # 2.2.3 存储信息（根据算法需要）
-                    self.agent.buffer.store_episode(obs, action, reward, obs_, done)
+                if step == self.max_episode_len - 1:
+                    done = True
+
+                # 2.2.3 存储信息（根据算法需要）
+                self.agent.buffer.store_episode(obs, action, reward, next_obs, done)
 
                 # 2.2.4 更新信息
-                obs = obs_
-                train_step += 1
+                obs = next_obs
 
-                # 2.2.5 智能体训练，每隔10步训练一次
-                if self.agent.buffer.ready():
-                    self.agent.train()
+                # 2.2.5 离线策略训练
+                if not self.agent.online_policy and self.agent.buffer.ready():
+                    self.agent.train(episode, self.logger)
 
                 # 2.2.6 记录对局reward
                 agent_episode_reward += reward
@@ -130,52 +173,47 @@ class Runner:
             agent_returns.append(agent_episode_reward)
             train_episode_step.append(step + 1)
 
+            if self.agent.online_policy:
+                self.agent.train(episode, self.logger)
+
+            if terminated is not None:
+                # 记录是否成功
+                self.logger.add_scalar('train/terminated', int(terminated), episode)
+            # 记录动作
+            action_list = self.agent.buffer.data['action']
+            cnt = 0
+            for action in action_list:
+                for i in range(len(action)):
+                    self.logger.add_scalar(f'train/action_{i}', action[i], cnt)
+                cnt += 1
+
             # 2.4 当训练没有完成时，任意一个智能体奖励提高时，保存模型，同时保存奖励数据
             if (episode + 1) % self.display_episodes == 0:
-                avg_agent_returns = np.mean(agent_returns[-self.display_episodes:])
-                if avg_agent_returns > best_agent_return:
-                    self.agent.save_checkpoint()
-
-                    best_agent_return = avg_agent_returns
-                    best_episodes = episode
-                    print(f"The reward is the most of the history when episode is {episode + 1}")
-
-                # 保存奖励数据
-                save_data(self.data_save_path, game_results, csv_name="game_results", column_name=['GameResults'])
-                save_data(self.data_save_path, agent_returns, csv_name="agent_returns", column_name=["ReturnsForAgent"])
-                save_data(self.data_save_path, train_episode_step, csv_name="train_episode_step",
-                          column_name=['EachEpisodeSteps'])
-
-                # 2.5 每100个回合记录训练曲线
-                plot_returns_curves(agent_returns, self.plt_save_path)
-
-                # 2.6 打印训练信息
-                print()
-                print('episode', episode + 1)
-                print('\naverage episode steps', np.mean(train_episode_step[-self.display_episodes:]))
-                print('agent average returns {:.1f}'.format(avg_agent_returns))
+                self.save_run_data(episode, agent_returns, game_results, train_episode_step)
 
         # 3.1 当训练完成时，保存模型
         if self.save_last_model:
-            self.agent.save_checkpoint()
+            self.agent.save_models()
 
         # 3.2 打印重要信息
-        print(f"The best reward of agent is {round(best_agent_return, 2)} when episode is {best_episodes + 1}")
+        print(
+            f"The best reward of agent is {round(self.best_agent_return, 2)} when episode is {self.best_episodes + 1}")
 
     def evaluate(self):
         # 加载预训练的模型
-        self.agent.load_checkpoint()
-
-        # 临时的保存数据窗口
-        from common.utils import save_expert_data
-        expert_obs_list, expert_action_list, expert_reward_list, expert_next_obs_list, expert_done_list = [], [], [], [], []
-        expert_path = "./model/expert_data"
-        if not os.path.exists(expert_path):
-            os.makedirs(expert_path)
+        self.agent.load_models()
+        # 输出网络结构
+        self.agent.show_graph(self.logger)
 
         # 初始化奖励
         agent_returns = []
         game_results = []
+        terminated = None
+        done = False
+        # 记录动作
+        action_list = []
+        # 记录每一步的奖励值
+        reward_list = []
 
         # 交互演示
         for episode in tqdm(range(self.evaluate_episodes)):
@@ -188,25 +226,26 @@ class Runner:
             # 对于episode中的步数进行迭代
             for step in range(self.max_episode_len):
                 # 可视化展示
-                # self.env.render()
-                # time.sleep(0.02)
+                self.env.render()
+                time.sleep(0.01)
 
                 # 智能体选择动作
                 action = self.agent.choose_action(obs)
+                action_list.append(action)
 
                 # 更新状态
-                with torch.no_grad():
-                    obs_, reward, done, info = self.env.step(action)
+                next_obs, reward, done, info = self.env.step(action)
 
-                # 保存专家数据
-                expert_obs_list.append(obs)
-                expert_action_list.append(action)
-                expert_reward_list.append(reward)
-                expert_next_obs_list.append(obs_)
-                expert_done_list.append(done)
+                if 'terminated' in info:
+                    terminated = info['terminated']
+
+                reward_list.append(reward)
+
+                if step == self.max_episode_len - 1:
+                    done = True
 
                 # 更新信息
-                obs = obs_
+                obs = next_obs
 
                 # 记录对局reward
                 agent_episode_reward += reward
@@ -218,14 +257,28 @@ class Runner:
             # 增加对局记录
             game_results.append(done)
 
-            # 增加对局奖励记录
-            agent_returns.append(agent_episode_reward)
+            # 记录动作日志
+            cnt = 0
+            for action in action_list:
+                for i in range(len(action)):
+                    self.logger.add_scalar(f'evaluate/action_{i}', action[i], cnt)
+                cnt += 1
+            action_list.clear()
 
-        save_expert_data(expert_path, "expert_obs", expert_obs_list)
-        save_expert_data(expert_path, "expert_action", expert_action_list)
-        save_expert_data(expert_path, "expert_reward", expert_reward_list)
-        save_expert_data(expert_path, "expert_next_obs", expert_next_obs_list)
-        save_expert_data(expert_path, "expert_done", expert_done_list)
+            cnt = 0
+            for r in reward_list:
+                self.logger.add_scalar(f'evaluate/reward', r, cnt)
+                cnt += 1
+            reward_list.clear()
+
+            if terminated is not None:
+                # 记录是否成功
+                self.logger.add_scalar('evaluate/terminated', int(terminated), episode)
+            self.logger.add_scalar('evaluate/episode_reward', agent_episode_reward, episode)
+
+            # 增加对局奖励记录
+            print(f"episode {episode}'s episode_reward:f{agent_episode_reward}")
+            agent_returns.append(agent_episode_reward)
 
         # 打印相关信息
         print(f"The probability of finishing the task is {np.sum(game_results) / len(game_results) * 100}%")

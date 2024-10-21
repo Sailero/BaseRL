@@ -1,15 +1,13 @@
-from random import random
-
 import numpy as np
 from env.forklift.env_client import EnvClient
 import cv2 as cv
-from common.utils import save_expert_data
-import time
 
 
 class IsaacSimEnvClient(EnvClient):
-    def __init__(self, ip: str = "192.168.7.117",
-                 port: int = 11800):
+    def __init__(self,
+                 ip: str = "192.168.7.117",
+                 port: int = 11800,
+                 pallet_random: bool = False):
         super().__init__(ip, port)
 
         # state 图像尺寸 640x480
@@ -17,16 +15,17 @@ class IsaacSimEnvClient(EnvClient):
         # 动作空间 2维 [车体速度 m/s，车体的角速度 rad/s]
         self.action_space = (2,)
 
+        self.pallet_random = pallet_random
+
         self.img = None
 
-    def reset(self, random=False):
+    def reset(self):
         """
         重置环境
-        :param random: 栈板位置随机
         :return: tuple[state: np.ndarray, info: dict]
         """
         # 发送重置指令
-        self.img, info = self.send({"cmd": "reset", "random": random})
+        self.img, info = self.send({"cmd": "reset", "random": self.pallet_random})
         return self.img, info
 
     def step(self, action: np.ndarray):
@@ -56,12 +55,9 @@ class IsaacSimEnvClient(EnvClient):
 
 
 if __name__ == "__main__":
-    env = IsaacSimEnvClient()
+    env = IsaacSimEnvClient(pallet_random=True)
 
-    # 栈板是否随机
-    pallet_random = False
-
-    img, info = env.reset(random=pallet_random)
+    img, info = env.reset()
     print("info: ", info)
     cv.imshow("img", img / 255.)
     cv.waitKey(0)
@@ -73,6 +69,7 @@ if __name__ == "__main__":
     vel_x = 0.4
     # 角度 rad
     rot = 10. * 0.017453292
+    last_pos = None
 
     while True:
         if is_stop:
@@ -85,18 +82,24 @@ if __name__ == "__main__":
             # print(action)
 
         # 发送动作指令
-        img_, reward, terminated, truncated, info = env.step(action)
-
+        img, reward, terminated, truncated, info = env.step(action)
         # print("wheel vel: ",info["wheel_velocities"])
         # print("wheel pos: ",info["wheel_positions"])
+        # print("reward: ", reward)
         # print("base pos: ", info["pos"][0])
+        # print("base angle: ", info["pos"][1])
+
+        # if last_pos is not None:
+        #     print("delta pos: ", abs(info["pos"][0][0] - last_pos[0]), ", ", abs(info["pos"][0][1] - last_pos[1]))
+        # last_pos = info["pos"][0]
+
         # print("base vel: ", info["vel_x"])
         # print("base rot: ", info["vel_rot"])
         # print("state", img.shape, "reward: ", reward, ", terminated: ", terminated, ", truncated: ", truncated)
         # print(info)
         # print("==========")
 
-        cv.imshow("img", img_ / 255.)
+        cv.imshow("img", img / 255.)
         # 按键控制
         key = cv.waitKey(0)
 
@@ -106,7 +109,7 @@ if __name__ == "__main__":
             break
         elif key & 0xFF == ord('r'):
             # 重置
-            _, info = env.reset(random=pallet_random)
+            _, info = env.reset()
             print("info: ", info)
         elif key & 0xFF == ord('p'):
             # 暂停 （仿真不运行）
@@ -118,7 +121,7 @@ if __name__ == "__main__":
         elif key & 0xFF == ord('a'):
             # 左转
             is_stop = False
-            key_action = np.array([0., -rot])
+            key_action = np.array([0.1, -rot])
         elif key & 0xFF == ord('q'):
             # 左前
             is_stop = False
@@ -126,7 +129,7 @@ if __name__ == "__main__":
         elif key & 0xFF == ord('d'):
             # 右转
             is_stop = False
-            key_action = np.array([0., rot])
+            key_action = np.array([0.1, rot])
         elif key & 0xFF == ord('e'):
             # 右前
             is_stop = False
@@ -139,12 +142,22 @@ if __name__ == "__main__":
             # 左后
             is_stop = False
             key_action = np.array([-vel_x, rot])
+        elif key & 0xFF == ord('x'):
+            # 左后(快速转)
+            is_stop = False
+            key_action = np.array([-0.1, rot * 3])
         elif key & 0xFF == ord('c'):
             # 右后
             is_stop = False
             key_action = np.array([-vel_x, -rot])
+        elif key & 0xFF == ord('v'):
+            # 右后(快速转)
+            is_stop = False
+            key_action = np.array([-0.1, -rot * 3])
 
         if terminated or truncated:
-            _, info = env.reset(random=pallet_random)
+            print("before reset, info: ", info)
+            _, info = env.reset()
+            action = np.array([0., 0.])
             print("terminated: ", terminated, ", truncated: ", truncated)
             print("info: ", info)
