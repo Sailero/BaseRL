@@ -3,6 +3,8 @@ import numpy as np
 
 
 class DDPG:
+    name="DDPG"
+
     def __init__(self, args):
         # Read the training parameters from args
         self.tau = args.tau
@@ -19,10 +21,10 @@ class DDPG:
         self.device = args.device  # 设备信息
 
         # import network
-        if isinstance(args.agent_obs_dim, int):
-            from agent.modules.actor_critic import Actor, Critic
+        if len(args.agent_obs_dim) == 1:
+            from agent.modules.deterministic_actor_critic import DeterministicActor as Actor, DeterministicCritic as Critic
         else:
-            from agent.modules.actor_critic_2d import Actor, Critic
+            from agent.modules.deterministic_actor_critic import DeterministicActor2d as Actor, DeterministicCritic2d as Critic
 
         # create the network
         self.actor_network = Actor(args, 'actor').to(self.device)
@@ -40,6 +42,9 @@ class DDPG:
         self.actor_optim = torch.optim.Adam(self.actor_network.parameters(), lr=args.lr_actor)
         self.critic_optim = torch.optim.Adam(self.critic_network.parameters(), lr=args.lr_critic)
 
+        # 记录训练过程数据
+        self.train_record = dict()
+
     # soft update
     def _soft_update_target_network(self):
         for target_param, param in zip(self.actor_target_network.parameters(), self.actor_network.parameters()):
@@ -47,6 +52,11 @@ class DDPG:
 
         for target_param, param in zip(self.critic_target_network.parameters(), self.critic_network.parameters()):
             target_param.data.copy_((1 - self.tau) * target_param.data + self.tau * param.data)
+
+    def add_graph(self, obs, action, logger):
+        from agent.policy.wrapper import WrapperState2
+        wrapper = WrapperState2(self.actor_network, self.critic_network)
+        logger.add_graph(wrapper, obs)
 
     # update the network
     def train(self, transitions):
@@ -73,6 +83,9 @@ class DDPG:
         batch_online_action = self.actor_network(batch_obs)
         actor_loss = - (self.critic_network(batch_obs, batch_online_action) - q_value.detach()).mean()
 
+        self.train_record[self.name + '/actor_loss'] = actor_loss.item()
+        self.train_record[self.name + '/critic_loss'] = critic_loss.item()
+
         # update the network
         self.actor_optim.zero_grad()
         actor_loss.backward()
@@ -84,10 +97,10 @@ class DDPG:
         # torch.nn.utils.clip_grad_norm_(self.critic_network.parameters(), 0.5)
         self.critic_optim.step()
 
-        print("\nactor_loss:", actor_loss)
-        print("critic_loss", critic_loss)
-        # print("batch_action:", batch_action)
-        print("batch_online_action:", batch_online_action[0])
+        # print("\nactor_loss:", actor_loss)
+        # print("critic_loss", critic_loss)
+        # # print("batch_action:", batch_action)
+        # print("batch_online_action:", batch_online_action[0])
 
         self._soft_update_target_network()
 

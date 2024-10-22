@@ -1,7 +1,7 @@
 import numpy as np
 
 
-class Buffer:
+class OfflineBuffer:
     def __init__(self, args):
         # Initialize the arguments parameters
         self.buffer = None
@@ -19,6 +19,13 @@ class Buffer:
 
     def reset(self):
         pass
+
+    @property
+    def data(self):
+        data_buffer = {}
+        for key in self.buffer.keys():
+            data_buffer[key] = self.buffer[key][:self.current_size]
+        return data_buffer
 
     def store_episode(self, obs_n, action_n, reward, next_obs_n, done):
         self.buffer['reward'][self.store_i] = reward

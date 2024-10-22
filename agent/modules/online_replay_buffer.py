@@ -1,7 +1,7 @@
 import numpy as np
 
 
-class Buffer:
+class OnlineBuffer:
     def __init__(self, args):
         # Initialize the arguments parameters
         self.buffer = dict()

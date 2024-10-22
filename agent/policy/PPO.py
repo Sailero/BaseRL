@@ -28,10 +28,10 @@ class PPO:
         self.value_loss_coef = args.value_loss_coef
 
         # import network
-        if isinstance(args.agent_obs_dim, int):
-            from agent.modules.online_actor_critic import Actor, Critic
+        if len(args.agent_obs_dim) == 1:
+            from agent.modules.stachastic_actor_critic import StochasticActor as Actor, StochasticCritic as Critic
         else:
-            from agent.modules.online_actor_critic_2d_shufflenet import Actor, Critic
+            from agent.modules.stachastic_actor_critic import StochasticActor2d as Actor, StochasticCritic2d as Critic
 
         # create the network
         self.actor_network = Actor(args, 'actor').to(self.device)

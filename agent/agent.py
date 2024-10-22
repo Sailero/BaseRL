@@ -15,21 +15,21 @@ class Agent:
         # 定义智能体的策略
         if self.policy_type == 'DDPG':
             from agent.policy.DDPG import DDPG
-            from agent.modules.replay_buffer import Buffer
+            from agent.modules.offline_replay_buffer import OfflineBuffer
             self.policy = DDPG(args)
-            self.buffer = Buffer(args)
+            self.buffer = OfflineBuffer(args)
             self.online_policy = False
         elif self.policy_type == 'PPO':
             from agent.policy.PPO import PPO
-            from agent.modules.online_replay_buffer import Buffer
-            self.buffer = Buffer(args)
+            from agent.modules.online_replay_buffer import OnlineBuffer
+            self.buffer = OnlineBuffer(args)
             self.policy = PPO(args)
             self.online_policy = True
         elif self.policy_type == 'GAIL_PPO':
             from agent.policy.PPO import PPO
-            from agent.modules.online_replay_buffer import Buffer
+            from agent.modules.online_replay_buffer import OnlineBuffer
             from agent.policy.GAIL import GAIL
-            self.buffer = Buffer(args)
+            self.buffer = OnlineBuffer(args)
             self.policy = GAIL(args, PPO(args))
             self.online_policy = True
 
@@ -47,7 +47,7 @@ class Agent:
         obs = torch.empty(shape).uniform_(0, 1).to(self.device)
         shape = [1] + [self.args.agent_action_dim]
         action = torch.empty(shape).uniform_(0, 1).to(self.device)
-        self.policy.add_graph(obs, action, logger)
+        self.policy.add_graph(obs, action, logger)    # 这里DDPG与PPO的critic输入格式不同，会报错
 
     def train(self, num, logger):
         transitions = self.buffer.sample()

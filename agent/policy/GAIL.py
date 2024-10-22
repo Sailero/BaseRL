@@ -10,7 +10,7 @@ class GAIL:
         self.device = args.device
         self.agent = agent
 
-        from agent.modules.online_actor_critic_2d_shufflenet import Discriminator
+        from agent.modules.stachastic_actor_critic import Discriminator
         self.discr_net = Discriminator(args, 'discriminator').to(self.device)
         # 可控制需要优化的参数
         self.discr_optim = torch.optim.Adam(filter(lambda p: p.requires_grad, self.discr_net.parameters()),

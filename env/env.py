@@ -12,7 +12,7 @@ class GymEnv:
                 self.env = gym.make(args.scenario_name)
 
             # 获取观测信息
-            self.agent_obs_dim = self.env.observation_space.shape[0]
+            self.agent_obs_dim = list(self.env.observation_space.shape)
 
             # 获取动作信息
             self.agent_action_dim = self.env.action_space.shape[0]  # 动作空间的维度
@@ -47,7 +47,7 @@ class MpeEnv:
             self.env = make_env(args.scenario_name)
 
             # 获取观测信息
-            self.agent_obs_dim = self.env.observation_space[0].shape[0]
+            self.agent_obs_dim = list(self.env.observation_space[0].shape)
 
             # 获取动作信息
             self.agent_action_dim = self.env.action_space[0].n
