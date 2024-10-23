@@ -136,28 +136,20 @@ class PPO:
                 # Critic update
                 gae_value = self.critic_network(batch_obs)
                 critic_loss = (batch_returns - gae_value).pow(2).mean()
+                # print('c_loss:', critic_loss)
+
+                self.critic_optim.zero_grad()
+                critic_loss.backward()
+                torch.nn.utils.clip_grad_norm_(self.critic_network.parameters(), self.max_grad_norm)
+                self.critic_optim.step()
                 self.train_record[self.name + '/critic_loss'] = critic_loss.item()
-
-                # print()
-                # print('actor_loss', actor_loss)
-                # print('critic_loss', critic_loss)
-
-                # Total loss
-                # total_loss = actor_loss  + self.value_loss_coef * critic_loss
 
                 # Update the network
                 self.actor_optim.zero_grad()
-                self.critic_optim.zero_grad()
-
-                # total_loss.backward()
                 actor_loss.backward()
-                critic_loss.backward()
-
                 torch.nn.utils.clip_grad_norm_(self.actor_network.parameters(), self.max_grad_norm)
-                torch.nn.utils.clip_grad_norm_(self.critic_network.parameters(), self.max_grad_norm)
-
                 self.actor_optim.step()
-                self.critic_optim.step()
+
 
     def choose_action(self, observation):
         # Choose action based on actor network

@@ -179,14 +179,21 @@ class Runner:
             if terminated is not None:
                 # 记录是否成功
                 self.logger.add_scalar('train/terminated', int(terminated), episode)
+            self.logger.add_scalar(f'train/episode_reward', agent_episode_reward, episode)
+            # 记录动作
+            action_list = self.agent.buffer.data['action']
+            cnt = 0
+            for action in action_list:
+                for i in range(len(action)):
+                    self.logger.add_scalar(f'train/action_{i}', action[i], cnt)
+                cnt += 1
 
-            # 记录动作（DDPG在这一个模块中存在bug，需要明白add_scalar加入的到底是什么才能debug）
-            # action_list = self.agent.buffer.data['action']
-            # cnt = 0
-            # for action in action_list:
-            #     for i in range(len(action)):
-            #         self.logger.add_scalar(f'train/action_{i}', action[i], cnt)
-            #     cnt += 1
+            # 记录奖励日志
+            reward_list = self.agent.buffer.data['reward']
+            cnt = 0
+            for r in reward_list:
+                self.logger.add_scalar(f'train/reward', r, cnt)
+                cnt += 1
 
             # 2.4 当训练没有完成时，任意一个智能体奖励提高时，保存模型，同时保存奖励数据
             if (episode + 1) % self.display_episodes == 0:
@@ -266,6 +273,7 @@ class Runner:
                 cnt += 1
             action_list.clear()
 
+            # 记录奖励日志
             cnt = 0
             for r in reward_list:
                 self.logger.add_scalar(f'evaluate/reward', r, cnt)

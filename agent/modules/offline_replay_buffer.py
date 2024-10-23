@@ -52,15 +52,12 @@ class OfflineBuffer:
             return True
 
     def initial_buffer(self):
-
-        obs_dim = list(self.agent_obs_dim) if isinstance(self.agent_obs_dim, (list, tuple)) else [self.agent_obs_dim]
-
         self.buffer = dict()
         self.buffer['reward'] = np.empty([self.buffer_size, 1])
         self.buffer['done'] = np.empty([self.buffer_size, 1], dtype=bool)
-        self.buffer['obs'] = np.zeros([self.buffer_size] + obs_dim)
+        self.buffer['obs'] = np.zeros([self.buffer_size] + self.agent_obs_dim)
         self.buffer['action'] = np.empty([self.buffer_size, self.agent_action_dim])
-        self.buffer['next_obs'] = np.zeros([self.buffer_size] + obs_dim)
+        self.buffer['next_obs'] = np.zeros([self.buffer_size] + self.agent_obs_dim)
 
     def load_buffer(self, load_obs, load_action, load_reward, load_next_obs, load_done):
         self.buffer['obs'][:len(load_obs)] = load_obs

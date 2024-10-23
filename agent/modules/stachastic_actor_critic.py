@@ -65,7 +65,23 @@ class StochasticCritic(ChkptModule):
         q_value = self.q_out(x)
         return q_value
 
+class Discriminator(ChkptModule):
+    def __init__(self, args, network_type):
+        super(Discriminator, self).__init__(args, network_type)
+        self.fc1 = torch.nn.Linear(args.agent_obs_dim[0] + args.agent_action_dim, args.discr_hidden_dim)
+        self.fc2 = torch.nn.Linear(args.discr_hidden_dim, 1)
 
+        # Initialize weights
+        self.fc1.weight.data.normal_(0, 0.1)
+        self.fc2.weight.data.normal_(0, 0.1)
+
+    def forward(self, s, a):
+        # Flatten to [batch_size, conv_out_size]
+        x = s.view(s.size(0), -1)
+
+        x = torch.cat([x, a], dim=1)
+        x = F.relu(self.fc1(x))
+        return torch.sigmoid(self.fc2(x))
 
 # 定义二维情形的AC网络
 def get_conv_out_size(shape, net):
@@ -76,9 +92,9 @@ def get_conv_out_size(shape, net):
     return int(torch.prod(torch.tensor(o.shape[1:])))
 
 
-class Discriminator(ChkptModule):
+class Discriminator2d(ChkptModule):
     def __init__(self, args, network_type):
-        super(Discriminator, self).__init__(args, network_type)
+        super(Discriminator2d, self).__init__(args, network_type)
         self.cnn = FeatureModel()
 
         # Compute the output size of conv layers

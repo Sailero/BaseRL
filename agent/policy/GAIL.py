@@ -10,7 +10,10 @@ class GAIL:
         self.device = args.device
         self.agent = agent
 
-        from agent.modules.stachastic_actor_critic import Discriminator
+        if len(args.agent_obs_dim) == 1:
+            from agent.modules.stachastic_actor_critic import Discriminator
+        else:
+            from agent.modules.stachastic_actor_critic import Discriminator2d as Discriminator
         self.discr_net = Discriminator(args, 'discriminator').to(self.device)
         # 可控制需要优化的参数
         self.discr_optim = torch.optim.Adam(filter(lambda p: p.requires_grad, self.discr_net.parameters()),
@@ -18,6 +21,7 @@ class GAIL:
 
         # 记录训练过程数据
         self.train_record = dict()
+        self.episode_num = 0
 
     def add_graph(self, obs, action, logger):
         from agent.policy.wrapper import WrapperStateAction3
@@ -57,7 +61,10 @@ class GAIL:
         discriminator_loss.backward()
         self.discr_optim.step()
 
-        rewards = -torch.log(agent_prob).detach().cpu().numpy()
+        ori_reward_ratio = 0.9  # np.clip((self.episode_num - 3000) / 1000, 0, 1.)
+        # print(np.array(agent_data['reward']).reshape(-1, 1)[0], -torch.log(agent_prob).detach().cpu().numpy()[0])
+        rewards = (-torch.log(agent_prob).detach().cpu().numpy() * (1 - ori_reward_ratio)
+                   + ori_reward_ratio * np.array(agent_data['reward']).reshape(-1, 1))
         self.train_record[self.name + '/rewards_mean'] = rewards.mean()
         new_transitions = {'obs': agent_obs,
                            'action': agent_actions,
@@ -66,6 +73,7 @@ class GAIL:
                            'done': agent_data['done']
                            }
         self.agent.train(new_transitions)
+        self.episode_num += 1
 
         # 合并 self.train_record 和 agent.train_record
         self.train_record.update(self.agent.train_record)

@@ -1,7 +1,7 @@
 import torch
 
 from common.arguments import get_args
-from common.utils import make_env
+from common.utils import make_env, set_random_seed
 from common.logger import Logger
 
 if __name__ == '__main__':
@@ -9,9 +9,10 @@ if __name__ == '__main__':
     args = get_args()
     env, args = make_env(args)
     logger = Logger(args)
+    set_random_seed(16)
 
     # Initialize the runner
-    if args.policy_type in ['GAIL_PPO']:
+    if args.policy_type in ['GAIL_PPO', 'GAIL_PPO_combined']:
         from runner.gail_runner import GAILRunner
         runner = GAILRunner(args, env, logger)
     else:

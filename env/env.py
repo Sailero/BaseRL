@@ -6,6 +6,7 @@ class GymEnv:
     def __init__(self, args):
         # 创建环境
         if args.scenario_name in ['MountainCarContinuous-v0', 'Pendulum-v1']:
+            self.scenario_name = args.scenario_name
             if args.evaluate:
                 self.env = gym.make(args.scenario_name, render_mode='human')
             else:
@@ -33,6 +34,8 @@ class GymEnv:
         # 反归一化
         action = action * self.action_high
         obs_, reward, done, info1, info2 = self.env.step(action)
+        if self.scenario_name == "MountainCarContinuous-v0":
+            reward = reward  + np.sum(action)**2*0.1
         return obs_, reward, done, [info1, info2]
 
     def render(self):

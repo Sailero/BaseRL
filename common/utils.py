@@ -3,6 +3,7 @@ import os
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
+import random
 
 def smooth(data, weight=0.96):
     sm_val = data[0]
@@ -66,6 +67,19 @@ def save_expert_data(expert_path, file_name, expert_data):
         np.save(file_path, expert_data)
         print(f"Data has been saved or appended to {file_path}. len: {len(expert_data)}")
 
+def set_random_seed(seed):
+    """
+    Set random seed for reproducibility.
+    """
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)  # if you are using multi-GPU
+        torch.backends.cudnn.deterministic = True  # to ensure deterministic results
+        torch.backends.cudnn.benchmark = False
+    os.environ['PYTHONHASHSEED'] = str(seed)  # for hash-based functions
 
 def make_env(args):
     # 创建环境

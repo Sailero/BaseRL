@@ -45,7 +45,7 @@ class OnlineBuffer:
     def sample_im(self):
         sample_buffer = {}
         # 随机从imitation buffer中采样
-        batch_id = np.random.choice(np.arange(self.im_buffer_size), size=self.im_sample_size, replace=False)
+        batch_id = np.random.choice(np.arange(self.im_buffer_size), size=self.im_sample_size, replace=True)
         for key in self.im_buffer.keys():
             # 由于为了减小图片的存储空间，保存的是int8格式的图片，因此需要转换成float32格式
             if key == 'obs' or key == 'next_obs':
