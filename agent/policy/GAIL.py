@@ -61,10 +61,7 @@ class GAIL:
         discriminator_loss.backward()
         self.discr_optim.step()
 
-        ori_reward_ratio = 0.9  # np.clip((self.episode_num - 3000) / 1000, 0, 1.)
-        # print(np.array(agent_data['reward']).reshape(-1, 1)[0], -torch.log(agent_prob).detach().cpu().numpy()[0])
-        rewards = (-torch.log(agent_prob).detach().cpu().numpy() * (1 - ori_reward_ratio)
-                   + ori_reward_ratio * np.array(agent_data['reward']).reshape(-1, 1))
+        rewards = -torch.log(agent_prob).detach().cpu().numpy()
         self.train_record[self.name + '/rewards_mean'] = rewards.mean()
         new_transitions = {'obs': agent_obs,
                            'action': agent_actions,
