@@ -3,9 +3,13 @@ import torch.nn as nn
 import numpy as np
 
 
-class GAIL_PPO:
+class DCDR_PPO:
     def __init__(self, args):
+        # 常见参数
         self.device = args.device
+        self.name = "DCDR_PPO"
+
+        # PPO训练参数读取
         self.gamma = args.gamma
         self.lam = args.lam
         self.eps_clip = args.eps_clip
@@ -13,7 +17,15 @@ class GAIL_PPO:
         self.update_nums = args.update_nums
         self.max_grad_norm = args.max_grad_norm
         self.action_clip = args.action_clip
-        self.name = "GAIL_PPO"
+
+        # DCDR参数读取
+        self.dr_min_ratio = args.dr_min_ratio
+        self.dr_max_ratio = args.dr_max_ratio
+        self.start_episode = args.start_episode
+        self.end_episode = args.end_episode
+        self.data_save_path = args.data_save_path
+        self.display_episodes = args.display_episodes
+        self.factor = 0
 
         # 网络初始化
         if len(args.agent_obs_dim) == 1:
@@ -63,6 +75,13 @@ class GAIL_PPO:
         expert_obs = torch.tensor(np.array(expert_data['obs']), dtype=torch.float32).to(self.device)
         expert_action = torch.tensor(np.array(expert_data['action']), dtype=torch.float32).to(self.device)
 
+        # 计算更新actor的critic系数比例，分别代表开始的回合，持续的回合以及原始奖励所占的比例
+        # combined_ratio = self.dr_min_ratio + (self.dr_max_ratio - self.dr_min_ratio) \
+        #                   * np.clip((self.episode_num - self.start_episode) / (self.end_episode - self.start_episode),
+        #                             0., 1.)
+        combined_ratio = self.dr_min_ratio + (self.dr_max_ratio - self.dr_min_ratio) * (
+                    1 / (1 + np.exp(-0.05 * (self.episode_num - (self.start_episode + self.end_episode) / 2))))
+
         # 1. 计算 Discriminator 的输出，用于 GAIL 奖励
         agent_prob = self.discr_net(agent_obs, agent_actions)
         expert_prob = self.discr_net(expert_obs, expert_action)
@@ -80,8 +99,9 @@ class GAIL_PPO:
 
         # 2. 结合 GAIL 奖励和 RL 奖励
         expert_rewards = -torch.log(agent_prob).detach().cpu().numpy()
-        ppo_rewards = np.array(agent_data['reward']).reshape(-1, 1)
         expert_rewards = (expert_rewards - expert_rewards.mean()) / (expert_rewards.std() + 1e-6)  # 标准化奖励
+
+        ppo_rewards = np.array(agent_data['reward']).reshape(-1, 1)
         ppo_rewards = (ppo_rewards - ppo_rewards.mean()) / (ppo_rewards.std() + 1e-6)  # 标准化奖励
 
         trans_len = len(agent_obs)
@@ -105,11 +125,6 @@ class GAIL_PPO:
         expert_advantages = torch.tensor(expert_advantages, dtype=torch.float32).reshape(expert_value.shape).to(self.device)
         ppo_returns = ppo_advantages + ppo_value  # Rt = At + V(st)
         expert_returns = expert_advantages + expert_value  # Rt = At + V(st)
-
-        # 计算更新actor的critic系数比例，分别代表开始的回合，持续的回合以及原始奖励所占的比例
-        start_episode = 0
-        decay_duration = 800
-        combined_ratio = np.clip((self.episode_num - start_episode) / decay_duration, 0.9, 1.)
 
         # 4. Actor 和 Critic 网络的更新
         for _ in range(self.update_nums):

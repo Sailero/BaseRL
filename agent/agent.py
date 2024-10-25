@@ -32,11 +32,11 @@ class Agent:
             self.buffer = OnlineBuffer(args)
             self.policy = GAIL(args, PPO(args))
             self.online_policy = True
-        elif self.policy_type == 'GAIL_PPO_combined':
-            from agent.policy.GAIL_PPO import GAIL_PPO
+        elif self.policy_type == 'DCDR_PPO':
+            from agent.policy.DCDR_PPO import DCDR_PPO
             from agent.modules.online_replay_buffer import OnlineBuffer
             self.buffer = OnlineBuffer(args)
-            self.policy = GAIL_PPO(args)
+            self.policy = DCDR_PPO(args)
             self.online_policy = True
 
     def choose_action(self, observation):

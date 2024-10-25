@@ -12,7 +12,7 @@ if __name__ == '__main__':
     set_random_seed(16)
 
     # Initialize the runner
-    if args.policy_type in ['GAIL_PPO', 'GAIL_PPO_combined']:
+    if args.policy_type in ['GAIL_PPO', 'DCDR_PPO']:
         from runner.gail_runner import GAILRunner
         runner = GAILRunner(args, env, logger)
     else:

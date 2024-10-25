@@ -30,6 +30,7 @@ class Runner:
 
         self.plt_save_path = os.path.join(args.save_path, 'plt_results')
         self.data_save_path = os.path.join(args.save_path, 'data_results')
+        args.data_save_path = self.data_save_path
 
         self.load_pre_model = args.load_pre_model
         self.save_last_model = args.save_last_model

@@ -24,8 +24,6 @@ class PPO:
         self.eps_clip = args.eps_clip
         self.action_clip = args.action_clip
         self.update_nums = args.update_nums
-        self.ent_coef = args.ent_coef  # entropy coefficient
-        self.value_loss_coef = args.value_loss_coef
 
         # import network
         if len(args.agent_obs_dim) == 1:
