@@ -30,7 +30,6 @@ class Runner:
 
         self.plt_save_path = os.path.join(args.save_path, 'plt_results')
         self.data_save_path = os.path.join(args.save_path, 'data_results')
-        args.data_save_path = self.data_save_path
 
         self.load_pre_model = args.load_pre_model
         self.save_last_model = args.save_last_model
@@ -212,7 +211,8 @@ class Runner:
         # 加载预训练的模型
         self.agent.load_models()
         # 输出网络结构
-        self.agent.show_graph(self.logger)
+        if not isinstance(self.env.agent_obs_dim, int):
+            self.agent.show_graph(self.logger)
 
         # 初始化奖励
         agent_returns = []

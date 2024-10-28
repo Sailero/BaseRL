@@ -19,6 +19,12 @@ class Agent:
             self.policy = DDPG(args)
             self.buffer = OfflineBuffer(args)
             self.online_policy = False
+        elif self.policy_type == 'SAC':
+            from agent.policy.SAC import SAC
+            from agent.modules.offline_replay_buffer_deque import Buffer
+            self.policy = SAC(args)
+            self.buffer = Buffer(args)
+            self.online_policy = False
         elif self.policy_type == 'PPO':
             from agent.policy.PPO import PPO
             from agent.modules.online_replay_buffer import OnlineBuffer
@@ -32,11 +38,18 @@ class Agent:
             self.buffer = OnlineBuffer(args)
             self.policy = GAIL(args, PPO(args))
             self.online_policy = True
-        elif self.policy_type == 'DCDR_PPO':
-            from agent.policy.DCDR_PPO import DCDR_PPO
+        elif self.policy_type == 'GAIL_SAC':
+            from agent.policy.SAC import SAC
+            from agent.modules.offline_replay_buffer_deque import Buffer
+            from agent.policy.GAIL import GAIL
+            self.buffer = Buffer(args)
+            self.policy = GAIL(args, SAC(args))
+            self.online_policy = False
+        elif self.policy_type == 'GAIL_PPO_combined':
+            from agent.policy.GAIL_PPO import GAIL_PPO
             from agent.modules.online_replay_buffer import OnlineBuffer
             self.buffer = OnlineBuffer(args)
-            self.policy = DCDR_PPO(args)
+            self.policy = GAIL_PPO(args)
             self.online_policy = True
 
     def choose_action(self, observation):
@@ -53,21 +66,26 @@ class Agent:
         obs = torch.empty(shape).uniform_(0, 1).to(self.device)
         shape = [1] + [self.args.agent_action_dim]
         action = torch.empty(shape).uniform_(0, 1).to(self.device)
-        self.policy.add_graph(obs, action, logger)    # 这里DDPG与PPO的critic输入格式不同，会报错
+        self.policy.add_graph(obs, action, logger)  # 这里DDPG与PPO的critic输入格式不同，会报错
 
     def train(self, num, logger):
         transitions = self.buffer.sample()
 
         if self.need_add_graph:
             self.need_add_graph = False
-            self.show_graph(logger)
+            if not isinstance(self.args.agent_obs_dim, int):
+                self.show_graph(logger)
 
         self.policy.train(transitions)
 
         # 记录log
         record = self.policy.train_record
         for v in self.policy.train_record.keys():
-            logger.add_scalar(v, record[v], num)
+            if isinstance(record[v], list | tuple):
+                for i, item in enumerate(record[v]):
+                    logger.add_scalar(v, item, i)
+            else:
+                logger.add_scalar(v, record[v], num)
 
     def save_models(self):
         print(f'... saving agent checkpoint ...')

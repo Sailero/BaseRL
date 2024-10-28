@@ -4,7 +4,7 @@ import argparse
 def get_args():
     parser = argparse.ArgumentParser("Reinforcement Learning experiments for single agent environments")
     # 训练的环境
-    parser.add_argument("--scenario-name", type=str, default="simple",
+    parser.add_argument("--scenario-name", type=str, default="Pendulum-v1",
                         help="scenario name for simulation."
                              "one of [MountainCarContinuous-v0, Pendulum-v1, simple, forklift]")
     parser.add_argument("--gpu-id", type=str, default="0",
@@ -13,20 +13,20 @@ def get_args():
                         help="whether to show the GUI of the environment")
 
     # forklift 环境的参数
-    parser.add_argument("--pallet-random", type=bool, default=False,
+    parser.add_argument("--pallet-random", type=bool, default=True,
                         help="whether to randomly place the pallet in the environment")
-    parser.add_argument("--forklift-episode-len", type=int, default=100,
+    parser.add_argument("--forklift-episode-len", type=int, default=30,
                         help="forklift number of episode steps")
 
     # 定义架构上的训练参数
-    parser.add_argument("--train-episodes", type=int, default=4000,
+    parser.add_argument("--train-episodes", type=int, default=100,
                         help="number of time steps")
     parser.add_argument("--load-pre-model", type=bool, default=False,
                         help="whether to load the previous model")
 
-    # 定义所有RL的训练参数
+    # 定义训练参数
     parser.add_argument("--policy-type", type=str, default='PPO',
-                        help="the policy type of single agent. one of PPO, DDPG, GAIL_PPO, DCDR_PPO")
+                        help="the policy type of single agent. one of PPO, DDPG, SAC, GAIL_PPO, GAIL_PPO_combined")
     parser.add_argument("--batch-size", type=int, default=32,
                         help="number of episodes to optimize at the same time")
     parser.add_argument("--actor_hidden_dim", type=int, default=128,
@@ -74,14 +74,18 @@ def get_args():
     parser.add_argument("--lr-discr", type=float, default=5e-5,
                         help="learning rate of discriminator")
 
-    # DCDR的训练参数
-    parser.add_argument("--dr_min_ratio", type=float, default=0.8,
+    # SAC 的训练参数
+    parser.add_argument("--lr-alpha", type=float, default=5e-5,
+                        help="learning rate of alpha")
+
+    # GAIL_PPO_combined的训练参数
+    parser.add_argument("--dr_min_ratio", type=float, default=0,
                         help="Dynamic rl min reward ratio in rl and gail reward")
     parser.add_argument("--dr_max_ratio", type=float, default=1,
                         help="Dynamic rl max reward ratio in rl and gail reward")
-    parser.add_argument("--start_episode", type=float, default=1200,
+    parser.add_argument("--start_episode", type=float, default=400,
                         help="Start episode for dynamic rl reward ratio increasing")
-    parser.add_argument("--end_episode", type=float, default=1201,
+    parser.add_argument("--end_episode", type=float, default=500,
                         help="End episode for dynamic rl reward ratio increasing")
 
     # 定义模型保存和加载的相关参数
@@ -99,7 +103,7 @@ def get_args():
                         help="whether to evaluate or not")
     parser.add_argument("--evaluate-episodes", type=int, default=100,
                         help="number of episodes for evaluating")
-    parser.add_argument("--display-episodes", type=int, default=100,
+    parser.add_argument("--display-episodes", type=int, default=5,
                         help="number of episodes for printing and plotting results")
     parser.add_argument("--force-save-model", type=bool, default=True,
                         help="force to save the model in each display episode whether the model is better or not")

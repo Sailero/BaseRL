@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import random
 
+
 def smooth(data, weight=0.96):
     sm_val = data[0]
     sm_list = []
@@ -67,6 +68,16 @@ def save_expert_data(expert_path, file_name, expert_data):
         np.save(file_path, expert_data)
         print(f"Data has been saved or appended to {file_path}. len: {len(expert_data)}")
 
+
+# 定义二维情形的AC网络
+def get_conv_out_size(shape, net):
+    # Pass dummy input to get the output size of the conv layers
+    shape = [3] + shape
+    o = torch.zeros(1, *shape)
+    o = net(o)
+    return int(torch.prod(torch.tensor(o.shape[1:])))
+
+
 def set_random_seed(seed):
     """
     Set random seed for reproducibility.
@@ -80,6 +91,7 @@ def set_random_seed(seed):
         torch.backends.cudnn.deterministic = True  # to ensure deterministic results
         torch.backends.cudnn.benchmark = False
     os.environ['PYTHONHASHSEED'] = str(seed)  # for hash-based functions
+
 
 def make_env(args):
     # 创建环境

@@ -46,7 +46,7 @@ class MpeEnv:
     def __init__(self, args):
         # 创建环境
         if args.scenario_name in ['simple']:
-            from mpe.make_env import make_env
+            from env.mpe.make_env import make_env
             self.env = make_env(args.scenario_name)
 
             # 获取观测信息
@@ -105,7 +105,7 @@ class ForkliftEnv:
         info['terminated'] = terminated
         info['truncated'] = truncated
 
-        return obs_ / 255., reward / 100., done, info
+        return obs_ / 255., reward, done, info
 
     def render(self):
         self.env.render()
@@ -118,7 +118,7 @@ class Env:
             self.env = GymEnv(args)
 
         elif args.scenario_name in ['simple']:
-            from mpe.make_env import make_env
+            from env.mpe.make_env import make_env
             self.env = MpeEnv(args)
 
         elif args.scenario_name in ['forklift']:

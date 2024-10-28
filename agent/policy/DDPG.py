@@ -24,7 +24,8 @@ class DDPG:
         if len(args.agent_obs_dim) == 1:
             from agent.modules.deterministic_actor_critic import DeterministicActor as Actor, DeterministicCritic as Critic
         else:
-            from agent.modules.deterministic_actor_critic import DeterministicActor2d as Actor, DeterministicCritic2d as Critic
+            from agent.modules.deterministic_actor_critic import DeterministicActor2d as Actor
+            from agent.modules.actor_critic import Critic2d as Critic
 
         # create the network
         self.actor_network = Actor(args, 'actor').to(self.device)

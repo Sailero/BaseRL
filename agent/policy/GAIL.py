@@ -11,9 +11,9 @@ class GAIL:
         self.agent = agent
 
         if len(args.agent_obs_dim) == 1:
-            from agent.modules.stachastic_actor_critic import Discriminator
+            from agent.modules.base_network import Discriminator
         else:
-            from agent.modules.stachastic_actor_critic import Discriminator2d as Discriminator
+            from agent.modules.base_network import Discriminator2d as Discriminator
         self.discr_net = Discriminator(args, 'discriminator').to(self.device)
         # 可控制需要优化的参数
         self.discr_optim = torch.optim.Adam(filter(lambda p: p.requires_grad, self.discr_net.parameters()),
@@ -24,8 +24,11 @@ class GAIL:
         self.episode_num = 0
 
     def add_graph(self, obs, action, logger):
-        from agent.policy.wrapper import WrapperStateAction3
-        wrapper = WrapperStateAction3(self.agent.actor_network, self.agent.critic_network, self.discr_net)
+        if "SAC" in self.agent.name:
+            from agent.policy.wrapper import WrapperStateAction3_1 as WrapperStateAction3
+        else:
+            from agent.policy.wrapper import WrapperStateAction3
+        wrapper = WrapperStateAction3(self.agent.actor_net, self.agent.critic_net, self.discr_net)
         logger.add_graph(wrapper, (obs, action))
 
     def save_models(self):

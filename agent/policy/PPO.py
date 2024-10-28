@@ -24,25 +24,28 @@ class PPO:
         self.eps_clip = args.eps_clip
         self.action_clip = args.action_clip
         self.update_nums = args.update_nums
+        self.ent_coef = args.ent_coef  # entropy coefficient
+        self.value_loss_coef = args.value_loss_coef
 
         # import network
         if len(args.agent_obs_dim) == 1:
             from agent.modules.stachastic_actor_critic import StochasticActor as Actor, StochasticCritic as Critic
         else:
-            from agent.modules.stachastic_actor_critic import StochasticActor2d as Actor, StochasticCritic2d as Critic
+            from agent.modules.stachastic_actor_critic import StochasticActor2d as Actor
+            from agent.modules.actor_critic import Critic2d as Critic
 
         # create the network
-        self.actor_network = Actor(args, 'actor').to(self.device)
-        self.old_actor_network = Actor(args, 'actor').to(self.device)
-        self.critic_network = Critic(args, 'critic').to(self.device)
+        self.actor_net = Actor(args, 'actor').to(self.device)
+        self.old_actor_net = Actor(args, 'actor').to(self.device)
+        self.critic_net= Critic(args, 'critic').to(self.device)
 
         # load the parameters
-        self.old_actor_network.load_state_dict(self.actor_network.state_dict())
+        self.old_actor_net.load_state_dict(self.actor_net.state_dict())
 
         # create the optimizer 可控制需要优化的参数
-        self.actor_optim = torch.optim.Adam(filter(lambda p: p.requires_grad, self.actor_network.parameters()),
+        self.actor_optim = torch.optim.Adam(filter(lambda p: p.requires_grad, self.actor_net.parameters()),
                                             lr=args.lr_actor)
-        self.critic_optim = torch.optim.Adam(filter(lambda p: p.requires_grad, self.critic_network.parameters()),
+        self.critic_optim = torch.optim.Adam(filter(lambda p: p.requires_grad, self.critic_net.parameters()),
                                              lr=args.lr_critic)
 
         # 记录训练过程数据
@@ -50,7 +53,7 @@ class PPO:
 
     def add_graph(self, obs, action, logger):
         from agent.policy.wrapper import WrapperState2
-        wrapper = WrapperState2(self.actor_network, self.critic_network)
+        wrapper = WrapperState2(self.actor_net, self.critic_net)
         logger.add_graph(wrapper, obs)
 
     # GAE (Generalized Advantage Estimation)
@@ -82,11 +85,11 @@ class PPO:
         trans_reward = (trans_reward - trans_reward.mean()) / (trans_reward.std() + 1e-6)
 
         # Load state dicts
-        self.old_actor_network.load_state_dict(self.actor_network.state_dict())
+        self.old_actor_net.load_state_dict(self.actor_net.state_dict())
 
         with torch.no_grad():
-            tran_value = self.critic_network(trans_obs)
-            tran_next_value = self.critic_network(trans_next_obs)
+            tran_value = self.critic_net(trans_obs)
+            tran_next_value = self.critic_net(trans_next_obs)
 
         # Calculate target values and advantages before updating
         with torch.no_grad():
@@ -110,12 +113,12 @@ class PPO:
 
                 # Calculate old log probs
                 with torch.no_grad():
-                    old_pi_mu, old_pi_sigma = self.old_actor_network(batch_obs)
+                    old_pi_mu, old_pi_sigma = self.old_actor_net(batch_obs)
                     old_pi = torch.distributions.Normal(old_pi_mu, old_pi_sigma)
                     batch_old_log_prob = old_pi.log_prob(batch_action).sum(-1, keepdim=True)
 
                 # Calculate new log probs
-                pi_mu, pi_std = self.actor_network(batch_obs)
+                pi_mu, pi_std = self.actor_net(batch_obs)
                 dist = torch.distributions.Normal(pi_mu, pi_std)
                 batch_new_log_prob = dist.log_prob(batch_action).sum(-1, keepdim=True)
 
@@ -132,29 +135,28 @@ class PPO:
                 self.train_record[self.name + '/actor_loss'] = actor_loss.item()
 
                 # Critic update
-                gae_value = self.critic_network(batch_obs)
+                gae_value = self.critic_net(batch_obs)
                 critic_loss = (batch_returns - gae_value).pow(2).mean()
                 # print('c_loss:', critic_loss)
 
                 self.critic_optim.zero_grad()
                 critic_loss.backward()
-                torch.nn.utils.clip_grad_norm_(self.critic_network.parameters(), self.max_grad_norm)
+                torch.nn.utils.clip_grad_norm_(self.critic_net.parameters(), self.max_grad_norm)
                 self.critic_optim.step()
                 self.train_record[self.name + '/critic_loss'] = critic_loss.item()
 
                 # Update the network
                 self.actor_optim.zero_grad()
                 actor_loss.backward()
-                torch.nn.utils.clip_grad_norm_(self.actor_network.parameters(), self.max_grad_norm)
+                torch.nn.utils.clip_grad_norm_(self.actor_net.parameters(), self.max_grad_norm)
                 self.actor_optim.step()
-
 
     def choose_action(self, observation):
         # Choose action based on actor network
         # inputs = torch.tensor(observation, dtype=torch.float32).unsqueeze(0).to(self.device)
         inputs = observation.clone().detach().unsqueeze(0).to(self.device)
         with torch.no_grad():
-            pi_mu, pi_std = self.actor_network(inputs)
+            pi_mu, pi_std = self.actor_net(inputs)
             pi_mu, pi_std = pi_mu.reshape(-1), pi_std.reshape(-1)
             # print('pi_mu', pi_mu, 'pi_std', pi_std)
         dist = torch.distributions.Normal(pi_mu, pi_std)
@@ -165,9 +167,9 @@ class PPO:
         return action.tolist()
 
     def save_models(self):
-        self.actor_network.save_checkpoint()
-        self.critic_network.save_checkpoint()
+        self.actor_net.save_checkpoint()
+        self.critic_net.save_checkpoint()
 
     def load_models(self):
-        self.actor_network.load_checkpoint()
-        self.critic_network.load_checkpoint()
+        self.actor_net.load_checkpoint()
+        self.critic_net.load_checkpoint()
