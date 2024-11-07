@@ -117,18 +117,8 @@ class StochasticActor2d(ChkptModule):
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
 
-        mu = self.mu(x)
-
-        mu1 = mu[:, 0]
-        mu2 = mu[:, 1]
-
-        mu1 = -F.softplus(mu1)
-        mu1 = torch.clip(mu1, -1, 0)
-
-        mu2 = torch.tanh(mu2) * 0.3
-
-        std = F.softplus(self.std(x)) * 0.2 + 1e-3
-        mu = torch.stack((mu1, mu2), dim=1)
+        mu = F.tanh(self.mu(x))
+        std = F.softplus(self.std(x))
 
         # 计算SAC特殊内容
         dist = torch.distributions.Normal(mu, std)

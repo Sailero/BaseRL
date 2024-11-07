@@ -77,43 +77,6 @@ class MpeEnv:
     def render(self):
         self.env.render()
 
-
-class ForkliftEnv:
-    def __init__(self, args):
-        from env.forklift.isaac_sim_env_client import IsaacSimEnvClient
-        self.env = IsaacSimEnvClient(pallet_random=FORKLIFT_CONFIG["pallet_random"])
-
-        self.agent_obs_dim = list(self.env.observation_space)
-        self.agent_action_dim = self.env.action_space[0]
-
-        self.action_low = FORKLIFT_CONFIG["action_low"]
-        self.action_high = FORKLIFT_CONFIG["action_high"]
-
-        self.max_episode_len = FORKLIFT_CONFIG["max_episode_len"]
-
-    def reset(self):
-        obs, info = self.env.reset()
-        return obs / 255.
-
-    def step(self, action):
-        action = np.array(action)
-        action = action * (self.action_high - self.action_low) + self.action_low
-
-        self.render()
-        obs_, reward, terminated, truncated, info = self.env.step(action)
-
-        done = False
-        if terminated or truncated:
-            done = True
-        info['terminated'] = terminated
-        info['truncated'] = truncated
-
-        return obs_ / 255., reward, done, info
-
-    def render(self):
-        self.env.render()
-
-
 class Env:
     def __init__(self, args):
         # 创建环境
@@ -124,8 +87,6 @@ class Env:
             from env.mpe.make_env import make_env
             self.env = MpeEnv(args)
 
-        elif args.scenario_name in ['forklift']:
-            self.env = ForkliftEnv(args)
         else:
             raise ValueError(f"{args.scenario_name} not supported")
 
