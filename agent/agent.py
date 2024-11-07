@@ -1,4 +1,11 @@
 import torch
+from agent_config import POLICY_MAP
+
+
+def load_class(path):
+    components = path.split('.')
+    module = __import__('.'.join(components[:-1]), fromlist=[components[-1]])
+    return getattr(module, components[-1])
 
 
 class Agent:
@@ -8,49 +15,18 @@ class Agent:
         self.args = args
         self.policy_type = args.policy_type
         self.device = args.device
-        self.imitation_learning = args.imitation_learning
+
         # 第一次需要输出网络图
         self.need_add_graph = True
 
-        # 定义智能体的策略
-        if self.policy_type == 'DDPG':
-            from agent.policy.DDPG import DDPG
-            from agent.modules.offline_replay_buffer import OfflineBuffer
-            self.policy = DDPG(args)
-            self.buffer = OfflineBuffer(args)
-            self.online_policy = False
-        elif self.policy_type == 'SAC':
-            from agent.policy.SAC import SAC
-            from agent.modules.offline_replay_buffer_deque import Buffer
-            self.policy = SAC(args)
-            self.buffer = Buffer(args)
-            self.online_policy = False
-        elif self.policy_type == 'PPO':
-            from agent.policy.PPO import PPO
-            from agent.modules.online_replay_buffer import OnlineBuffer
-            self.buffer = OnlineBuffer(args)
-            self.policy = PPO(args)
-            self.online_policy = True
-        elif self.policy_type == 'GAIL_PPO':
-            from agent.policy.PPO import PPO
-            from agent.modules.online_replay_buffer import OnlineBuffer
-            from agent.policy.GAIL import GAIL
-            self.buffer = OnlineBuffer(args)
-            self.policy = GAIL(args, PPO(args))
-            self.online_policy = True
-        elif self.policy_type == 'GAIL_SAC':
-            from agent.policy.SAC import SAC
-            from agent.modules.offline_replay_buffer_deque import Buffer
-            from agent.policy.GAIL import GAIL
-            self.buffer = Buffer(args)
-            self.policy = GAIL(args, SAC(args))
-            self.online_policy = False
-        elif self.policy_type == 'GAIL_PPO_combined':
-            from agent.policy.GAIL_PPO import GAIL_PPO
-            from agent.modules.online_replay_buffer import OnlineBuffer
-            self.buffer = OnlineBuffer(args)
-            self.policy = GAIL_PPO(args)
-            self.online_policy = True
+        # 根据策略类型加载策略和缓冲区
+        config = POLICY_MAP.get(self.policy_type)
+        if config:
+            self.policy = load_class(config['policy'])(args)
+            self.buffer = load_class(config['buffer'])(args)
+            self.online_policy = config['online_policy']
+        else:
+            raise ValueError(f"Unsupported policy type: {self.policy_type}")
 
     def choose_action(self, observation):
         # 将输入放在gpu上运行
@@ -66,26 +42,36 @@ class Agent:
         obs = torch.empty(shape).uniform_(0, 1).to(self.device)
         shape = [1] + [self.args.agent_action_dim]
         action = torch.empty(shape).uniform_(0, 1).to(self.device)
-        self.policy.add_graph(obs, action, logger)  # 这里DDPG与PPO的critic输入格式不同，会报错
+        self.policy.add_graph(obs, action, logger)
 
     def train(self, num, logger):
         transitions = self.buffer.sample()
 
         if self.need_add_graph:
             self.need_add_graph = False
-            if not isinstance(self.args.agent_obs_dim, int):
+            if not isinstance(self.args.agent_obs_dim, int) and self.online_policy:
                 self.show_graph(logger)
 
         self.policy.train(transitions)
 
-        # 记录log
-        record = self.policy.train_record
-        for v in self.policy.train_record.keys():
-            if isinstance(record[v], list | tuple):
-                for i, item in enumerate(record[v]):
-                    logger.add_scalar(v, item, i)
-            else:
-                logger.add_scalar(v, record[v], num)
+        if self.online_policy:
+            self.buffer.initial_buffer()
+
+        # self.log_training_metrics(logger, num)
+
+    def log_training_metrics(self, logger, num):
+        record = getattr(self.policy, "train_record", None)
+        if record:
+            for key, value in record.items():
+                if isinstance(value, (list, tuple)):
+                    for i, item in enumerate(value):
+                        if isinstance(item, (list, tuple)):
+                            for c, sub_item in enumerate(item):
+                                logger.add_scalar(f'{key}_{c}', sub_item, num + i)
+                        else:
+                            logger.add_scalar(f'{key}', item, num + i)
+                else:
+                    logger.add_scalar(f'{key}', value, num)
 
     def save_models(self):
         print(f'... saving agent checkpoint ...')

@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 
 from agent.agent import Agent
 from common.utils import smooth, save_data, plot_returns_curves
+from runner.runner_config import *
 
 
 class Runner:
@@ -21,7 +22,6 @@ class Runner:
         self.device = args.device
 
         # 加载args中训练有关参数
-        self.render = args.render
         self.max_episode_len = args.max_episode_len
         self.train_episodes = args.train_episodes
         self.compare_path = args.save_path
@@ -38,8 +38,7 @@ class Runner:
         self.agent = Agent(args)
 
         # 加载演示有关参数
-        self.is_evaluated = args.evaluate
-        self.evaluate_episodes = args.evaluate_episodes
+        self.evaluate_episodes = EVALUATE_EPISODES
         self.display_episodes = args.display_episodes
         self.force_save_model = args.force_save_model
 
@@ -57,30 +56,6 @@ class Runner:
             os.makedirs(self.data_save_path)
         if not os.path.exists(self.expert_data_path):
             os.makedirs(self.expert_data_path)
-
-    def load_expert_data(self):
-        # 加载专家数据
-        expert_obs = np.load(self.expert_data_path + '/expert_obs.npy')
-        expert_action = np.load(self.expert_data_path + '/expert_action.npy')
-        expert_reward = np.load(self.expert_data_path + '/expert_reward.npy').reshape([-1, 1])
-        expert_next_obs = np.load(self.expert_data_path + '/expert_next_obs.npy')
-        expert_done = np.load(self.expert_data_path + '/expert_done.npy').reshape([-1, 1])
-
-        print("sample data nums:", len(expert_obs))
-        print("obs shape", expert_obs.shape)
-        print("action shape", expert_action.shape)
-
-        self.agent.buffer.load_buffer(expert_obs, expert_action, expert_reward, expert_next_obs, expert_done)
-
-    def imitation_learning(self):
-        self.load_expert_data()
-
-        for num in tqdm(range(self.train_episodes)):
-            self.agent.train(num, self.logger)
-
-        self.agent.save_models()
-
-        self.evaluate()
 
     def save_run_data(self, episode, agent_returns, game_results, train_episode_step):
         avg_agent_returns = np.mean(agent_returns[-self.display_episodes:])
@@ -131,14 +106,9 @@ class Runner:
             agent_episode_reward = 0
             done = False
             step = 0
-            self.agent.buffer.reset()
 
             # 2.2 开始episode内的迭代
             for step in range(self.max_episode_len):
-                # 2.2.0 显示训练过程
-                if self.render:
-                    self.env.render()
-                    time.sleep(0.01)
 
                 # 2.2.1 智能体选择动作
                 action = self.agent.choose_action(obs)
@@ -180,20 +150,22 @@ class Runner:
                 # 记录是否成功
                 self.logger.add_scalar('train/terminated', int(terminated), episode)
             self.logger.add_scalar(f'train/episode_reward', agent_episode_reward, episode)
-            # 记录动作
-            action_list = self.agent.buffer.data['action']
-            cnt = 0
-            for action in action_list:
-                for i in range(len(action)):
-                    self.logger.add_scalar(f'train/action_{i}', action[i], cnt)
-                cnt += 1
 
-            # 记录奖励日志
-            reward_list = self.agent.buffer.data['reward']
-            cnt = 0
-            for r in reward_list:
-                self.logger.add_scalar(f'train/reward', r, cnt)
-                cnt += 1
+            # 记录动作(这部分会极大降低训练速度）
+            # if self.agent.online_policy:
+            #     action_list = self.agent.buffer.data['action']
+            #     cnt = 0
+            #     for action in action_list:
+            #         for i in range(len(action)):
+            #             self.logger.add_scalar(f'train/action_{i}', action[i], cnt)
+            #         cnt += 1
+            #
+            #     # 记录奖励日志
+            #     reward_list = self.agent.buffer.data['reward']
+            #     cnt = 0
+            #     for r in reward_list:
+            #         self.logger.add_scalar(f'train/reward', r, cnt)
+            #         cnt += 1
 
             # 2.4 当训练没有完成时，任意一个智能体奖励提高时，保存模型，同时保存奖励数据
             if (episode + 1) % self.display_episodes == 0:
@@ -324,7 +296,7 @@ class Runner:
             alpha = [0.1, 1]
             weight = [0.8, 0.96]
             linewidth = [4, 0.5]
-            colors = ['blue', 'red', 'gree', 'darkred', 'orange', 'violet', 'brown', 'navy', 'teal']
+            colors = ['blue', 'red', 'green', 'darkred', 'orange', 'violet', 'brown', 'navy', 'teal']
 
             for j in range(data.shape[2]):
                 for i in range(data.shape[0]):

@@ -66,7 +66,7 @@ if __name__ == "__main__":
     is_stop = True
     key_action = np.array([0., 0.])
     # 线速度 m/s
-    vel_x = 0.4
+    vel_x = 0.6
     # 角度 rad
     rot = 10. * 0.017453292
     last_pos = None
@@ -85,9 +85,10 @@ if __name__ == "__main__":
         img, reward, terminated, truncated, info = env.step(action)
         # print("wheel vel: ",info["wheel_velocities"])
         # print("wheel pos: ",info["wheel_positions"])
-        # print("dist_reward: ", info["dist_reward"])
-        # print("center_reward: ", info["center_reward"])
-        # print("angle_reward: ", info["angle_reward"])
+        # if "dist_reward" in info:
+        #     print("dist_reward: ", info["dist_reward"])
+        #     print("center_reward: ", info["center_reward"])
+        #     print("angle_reward: ", info["angle_reward"])
         # print("reward: ", reward)
         # print("base pos: ", info["pos"][0])
         # print("base angle: ", info["pos"][1])

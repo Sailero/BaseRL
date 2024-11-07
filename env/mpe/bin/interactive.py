@@ -26,7 +26,7 @@ if __name__ == '__main__':
     # execution loop
     obs_n = env.reset()
     while True:
-        # query for action from each agent's policy
+        # query for action from each agent's off_policy
         act_n = []
         for i, policy in enumerate(policies):
             act_n.append(policy.action(obs_n[i]))

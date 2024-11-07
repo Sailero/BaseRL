@@ -4,89 +4,20 @@ import argparse
 def get_args():
     parser = argparse.ArgumentParser("Reinforcement Learning experiments for single agent environments")
     # 训练的环境
-    parser.add_argument("--scenario-name", type=str, default="Pendulum-v1",
+    parser.add_argument("--scenario-name", type=str, default="simple",
                         help="scenario name for simulation."
                              "one of [MountainCarContinuous-v0, Pendulum-v1, simple, forklift]")
     parser.add_argument("--gpu-id", type=str, default="0",
                         help="config which gpu to use")
-    parser.add_argument("--render", type=bool, default=False,
-                        help="whether to show the GUI of the environment")
 
-    # forklift 环境的参数
-    parser.add_argument("--pallet-random", type=bool, default=True,
-                        help="whether to randomly place the pallet in the environment")
-    parser.add_argument("--forklift-episode-len", type=int, default=30,
-                        help="forklift number of episode steps")
 
     # 定义架构上的训练参数
-    parser.add_argument("--train-episodes", type=int, default=100,
+    parser.add_argument("--train-episodes", type=int, default=1000,
                         help="number of time steps")
     parser.add_argument("--load-pre-model", type=bool, default=False,
                         help="whether to load the previous model")
-
-    # 定义训练参数
-    parser.add_argument("--policy-type", type=str, default='PPO',
-                        help="the policy type of single agent. one of PPO, DDPG, SAC, GAIL_PPO, GAIL_PPO_combined")
-    parser.add_argument("--batch-size", type=int, default=32,
-                        help="number of episodes to optimize at the same time")
-    parser.add_argument("--actor_hidden_dim", type=int, default=128,
-                        help="hidden dims of actor network")
-    parser.add_argument("--critic_hidden_dim", type=int, default=128,
-                        help="hidden dims of critic network")
-    parser.add_argument("--lr-actor", type=float, default=5e-5,
-                        help="learning rate of actor")
-    parser.add_argument("--lr-critic", type=float, default=1e-4,
-                        help="learning rate of critic")
-    parser.add_argument("--gamma", type=float, default=0.99,
-                        help="discount factor")
-
-    # DDPG的独有参数
-    parser.add_argument("--buffer-size", type=int, default=int(1e5),
-                        help="number of transitions can be stored in buffer")
-    parser.add_argument("--epsilon", type=float, default=0.1,
-                        help="epsilon greedy")
-    parser.add_argument("--noise_rate", type=float, default=0.1,
-                        help="noise rate for sampling from a standard normal distribution ")
-    parser.add_argument("--tau", type=float, default=0.01,
-                        help="parameter for updating the target network")
-
-    # PPO的独有参数
-    parser.add_argument("--lam", type=float, default=0.95,
-                        help="coef for GAE")
-    parser.add_argument("--eps-clip", type=float, default=0.2,
-                        help="importance ratio parameters for clipping")
-    parser.add_argument("--action-clip", type=float, default=1.0,
-                        help="max amplitude actions allowed")
-    parser.add_argument("--update-nums", type=int, default=5,
-                        help="Number of steps required for each model update")
-    parser.add_argument("--max-grad-norm", type=float, default=0.5,
-                        help="max grad norm")
-
-    # 定义模仿学习的参数
-    parser.add_argument("--imitation-learning", type=bool, default=False,
-                        help="whether to do imitation learning")
-    parser.add_argument("--im-sample-size", type=int, default=32,
-                        help="number of transitions sampled from expert data each time")
-
-    # GAIL 的训练参数
-    parser.add_argument("--discr-hidden-dim", type=int, default=128,
-                        help="hidden dims of discriminator network")
-    parser.add_argument("--lr-discr", type=float, default=5e-5,
-                        help="learning rate of discriminator")
-
-    # SAC 的训练参数
-    parser.add_argument("--lr-alpha", type=float, default=5e-5,
-                        help="learning rate of alpha")
-
-    # GAIL_PPO_combined的训练参数
-    parser.add_argument("--dr_min_ratio", type=float, default=0,
-                        help="Dynamic rl min reward ratio in rl and gail reward")
-    parser.add_argument("--dr_max_ratio", type=float, default=1,
-                        help="Dynamic rl max reward ratio in rl and gail reward")
-    parser.add_argument("--start_episode", type=float, default=400,
-                        help="Start episode for dynamic rl reward ratio increasing")
-    parser.add_argument("--end_episode", type=float, default=500,
-                        help="End episode for dynamic rl reward ratio increasing")
+    parser.add_argument("--policy-type", type=str, default='GAIL_PPO',
+                        help="the policy type of single agent. one of PPO, DDPG, SAC, GAIL_PPO, GAIL_SAC")
 
     # 定义模型保存和加载的相关参数
     parser.add_argument("--save-dir", type=str, default="./model",
@@ -97,13 +28,10 @@ def get_args():
                         help="directory in which training state and model should be saved")
 
     # 定义可视化的相关参数
-    parser.add_argument("--compare", type=bool, default=False,
-                        help="whether to compare or not")
-    parser.add_argument("--evaluate", type=bool, default=False,
-                        help="whether to evaluate or not")
-    parser.add_argument("--evaluate-episodes", type=int, default=100,
-                        help="number of episodes for evaluating")
-    parser.add_argument("--display-episodes", type=int, default=5,
+    parser.add_argument("--task-type", type=str, default="train",
+                        help="the task type of the model."
+                             "one of the [train, evaluate, compare]")
+    parser.add_argument("--display-episodes", type=int, default=100,
                         help="number of episodes for printing and plotting results")
     parser.add_argument("--force-save-model", type=bool, default=True,
                         help="force to save the model in each display episode whether the model is better or not")

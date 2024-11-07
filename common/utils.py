@@ -103,8 +103,9 @@ def make_env(args):
 
     # 获取动作信息
     args.agent_action_dim = env.agent_action_dim
-
     args.max_episode_len = env.max_episode_len
+
+    args.imitation_learning = True if args.policy_type in ["GAIL_PPO", "GAIL_SAC"] else False
 
     # 获取训练中的保存路径
     args.save_path = os.path.join(args.save_dir, args.scenario_name)
