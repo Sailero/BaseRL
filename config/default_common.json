@@ -14,8 +14,8 @@
 
     "train": {
         "simple": {
-            "train_episodes": 3000,
-            "display_episodes": 300,
+            "train_episodes": 2000,
+            "display_episodes": 100,
             "evaluate_episodes": 100,
             "load_pre_model": false,
             "force_save_model": false,

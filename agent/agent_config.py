@@ -1,4 +1,4 @@
-# 定义策略类型和对应的类映射关系
+# Define the mapping of policy types to corresponding class configurations
 POLICY_MAP = {
     'DDPG': {
         'policy': 'agent.off_policy.DDPG.ddpg.DDPG',
