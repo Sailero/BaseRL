@@ -1,6 +1,0 @@
-todolist：
-1. gail_ddpg完成
-2. 测试Forklift环境中的一维训练情形
-3. hydra参数管理框架实现
-4. 提高GAIL_PPO的利用专家数据的效率，进而快速收敛
-5. log的bug问题

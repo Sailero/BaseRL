@@ -3,44 +3,40 @@ import numpy as np
 import time
 import os
 import pandas as pd
-
 import matplotlib
-
 matplotlib.use('agg')
 import matplotlib.pyplot as plt
 
 from agent.agent import Agent
 from common.utils import smooth, save_data, plot_returns_curves
-from runner.runner_config import *
 
 
 class Runner:
-    def __init__(self, args, env, logger):
-        self.logger = logger
+    def __init__(self, config, env):
         # 加载环境
         self.env = env
-        self.device = args.device
+        self.device = config.device.device
 
         # 加载args中训练有关参数
-        self.max_episode_len = args.max_episode_len
-        self.train_episodes = args.train_episodes
-        self.compare_path = args.save_path
-        self.expert_data_path = args.expert_data_path
-        args.save_path = os.path.join(args.save_path, f"{args.policy_type}")
+        self.max_episode_len = config.env.max_episode_len
+        self.train_episodes = config.env.train_episodes
+        self.compare_path = config.save_path
+        self.expert_data_path = config.expert_data_path
+        config.save_path = os.path.join(config.save_path, f"{config.policy_type}")
 
-        self.plt_save_path = os.path.join(args.save_path, 'plt_results')
-        self.data_save_path = os.path.join(args.save_path, 'data_results')
+        self.plt_save_path = os.path.join(config.save_path, 'plt_results')
+        self.data_save_path = os.path.join(config.save_path, 'data_results')
 
-        self.load_pre_model = args.load_pre_model
-        self.save_last_model = args.save_last_model
+        self.load_pre_model = config.env.load_pre_model
+        self.save_last_model = config.env.save_last_model
 
         # 加载智能体
-        self.agent = Agent(args)
+        self.agent = Agent(config)
 
         # 加载演示有关参数
-        self.evaluate_episodes = EVALUATE_EPISODES
-        self.display_episodes = args.display_episodes
-        self.force_save_model = args.force_save_model
+        self.evaluate_episodes = 100
+        self.display_episodes = config.env.display_episodes
+        self.force_save_model = config.env.force_save_model
 
         # 训练相关
         # 初始化最大奖励
@@ -48,16 +44,14 @@ class Runner:
         self.best_episodes = 0
 
         # 创建保存路径
-        if not os.path.exists(args.save_path):
-            os.makedirs(args.save_path)
+        if not os.path.exists(config.save_path):
+            os.makedirs(config.save_path)
         if not os.path.exists(self.plt_save_path):
             os.makedirs(self.plt_save_path)
         if not os.path.exists(self.data_save_path):
             os.makedirs(self.data_save_path)
-        if not os.path.exists(self.expert_data_path):
-            os.makedirs(self.expert_data_path)
 
-    def save_run_data(self, episode, agent_returns, game_results, train_episode_step):
+    def save_run_data(self, episode, agent_returns, train_episode_step):
         avg_agent_returns = np.mean(agent_returns[-self.display_episodes:])
         if avg_agent_returns > self.best_agent_return:
             self.agent.save_models()
@@ -71,7 +65,6 @@ class Runner:
             self.agent.save_models()
 
         # 保存奖励数据
-        save_data(self.data_save_path, game_results, csv_name="game_results", column_name=['GameResults'])
         save_data(self.data_save_path, agent_returns, csv_name="agent_returns", column_name=["ReturnsForAgent"])
         save_data(self.data_save_path, train_episode_step, csv_name="train_episode_step",
                   column_name=['EachEpisodeSteps'])
@@ -89,9 +82,7 @@ class Runner:
         # 1. 训练准备
         # 初始化奖励列表与完成列表
         agent_returns = []
-        game_results = []
         train_episode_step = []
-        terminated = None
 
         # 是否加载先前训练的模型
         if self.load_pre_model:
@@ -104,20 +95,14 @@ class Runner:
 
             # 记录对局reward
             agent_episode_reward = 0
-            done = False
-            step = 0
 
             # 2.2 开始episode内的迭代
             for step in range(self.max_episode_len):
-
                 # 2.2.1 智能体选择动作
                 action = self.agent.choose_action(obs)
 
                 # 2.2.2 智能体更新状态
                 next_obs, reward, done, info = self.env.step(action)
-                if 'terminated' in info:
-                    terminated = info['terminated']
-
                 if step == self.max_episode_len - 1:
                     done = True
 
@@ -129,7 +114,7 @@ class Runner:
 
                 # 2.2.5 离线策略训练
                 if not self.agent.online_policy and self.agent.buffer.ready():
-                    self.agent.train(episode, self.logger)
+                    self.agent.train()
 
                 # 2.2.6 记录对局reward
                 agent_episode_reward += reward
@@ -139,37 +124,15 @@ class Runner:
                     break
 
             # 2.3 增加对局和奖励记录
-            game_results.append(done)
             agent_returns.append(agent_episode_reward)
             train_episode_step.append(step + 1)
 
             if self.agent.online_policy:
-                self.agent.train(episode, self.logger)
-
-            if terminated is not None:
-                # 记录是否成功
-                self.logger.add_scalar('train/terminated', int(terminated), episode)
-            self.logger.add_scalar(f'train/episode_reward', agent_episode_reward, episode)
-
-            # 记录动作(这部分会极大降低训练速度）
-            # if self.agent.online_policy:
-            #     action_list = self.agent.buffer.data['action']
-            #     cnt = 0
-            #     for action in action_list:
-            #         for i in range(len(action)):
-            #             self.logger.add_scalar(f'train/action_{i}', action[i], cnt)
-            #         cnt += 1
-            #
-            #     # 记录奖励日志
-            #     reward_list = self.agent.buffer.data['reward']
-            #     cnt = 0
-            #     for r in reward_list:
-            #         self.logger.add_scalar(f'train/reward', r, cnt)
-            #         cnt += 1
+                self.agent.train()
 
             # 2.4 当训练没有完成时，任意一个智能体奖励提高时，保存模型，同时保存奖励数据
             if (episode + 1) % self.display_episodes == 0:
-                self.save_run_data(episode, agent_returns, game_results, train_episode_step)
+                self.save_run_data(episode, agent_returns, train_episode_step)
 
         # 3.1 当训练完成时，保存模型
         if self.save_last_model:
@@ -182,19 +145,9 @@ class Runner:
     def evaluate(self):
         # 加载预训练的模型
         self.agent.load_models()
-        # 输出网络结构
-        if not isinstance(self.env.agent_obs_dim, int):
-            self.agent.show_graph(self.logger)
 
         # 初始化奖励
         agent_returns = []
-        game_results = []
-        terminated = None
-        done = False
-        # 记录动作
-        action_list = []
-        # 记录每一步的奖励值
-        reward_list = []
 
         # 交互演示
         for episode in tqdm(range(self.evaluate_episodes)):
@@ -212,16 +165,9 @@ class Runner:
 
                 # 智能体选择动作
                 action = self.agent.choose_action(obs)
-                action_list.append(action)
 
                 # 更新状态
                 next_obs, reward, done, info = self.env.step(action)
-
-                if 'terminated' in info:
-                    terminated = info['terminated']
-
-                reward_list.append(reward)
-
                 if step == self.max_episode_len - 1:
                     done = True
 
@@ -235,35 +181,9 @@ class Runner:
                 if done:
                     break
 
-            # 增加对局记录
-            game_results.append(done)
-
-            # 记录动作日志
-            cnt = 0
-            for action in action_list:
-                for i in range(len(action)):
-                    self.logger.add_scalar(f'evaluate/action_{i}', action[i], cnt)
-                cnt += 1
-            action_list.clear()
-
-            # 记录奖励日志
-            cnt = 0
-            for r in reward_list:
-                self.logger.add_scalar(f'evaluate/reward', r, cnt)
-                cnt += 1
-            reward_list.clear()
-
-            if terminated is not None:
-                # 记录是否成功
-                self.logger.add_scalar('evaluate/terminated', int(terminated), episode)
-            self.logger.add_scalar('evaluate/episode_reward', agent_episode_reward, episode)
-
             # 增加对局奖励记录
             print(f"episode {episode}'s episode_reward:f{agent_episode_reward}")
             agent_returns.append(agent_episode_reward)
-
-        # 打印相关信息
-        print(f"The probability of finishing the task is {np.sum(game_results) / len(game_results) * 100}%")
 
     def compare_models_curves(self):
         # 从所有子文件夹里获取数据
@@ -281,8 +201,6 @@ class Runner:
             return data, folder_list
 
         # 获取数据
-
-        game_results, folder_list = get_data("game_results")
         agent_returns, _ = get_data("agent_returns")
         train_episode_step, _ = get_data("train_episode_step")
 
@@ -316,6 +234,5 @@ class Runner:
                 plt.close()
                 print(f'Different policies {name} figure is saved')
 
-        plot_data(game_results, 'game_results')
         plot_data(agent_returns, 'agent_returns')
         plot_data(train_episode_step, 'train_episode_step')

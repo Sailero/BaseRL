@@ -1,0 +1,11 @@
+{
+    "policy_type": "PPO",
+    "params": {
+        "lam": 0.95,
+        "eps_clip": 0.2,
+        "update_nums": 10,
+        "ent_coef": 0.05,
+        "buffer_size": 1024,
+        "batch_size": 128
+    }
+}

@@ -4,17 +4,16 @@ import torch.nn.functional as F
 from agent.modules.base_network import ChkptModule
 from agent.modules.feature_model import FeatureModel
 from common.utils import get_conv_out_size
-from agent.off_policy.offp_config import SAC_CONFIG
 
 
 # 定义一维情形的AC网络
 class StochasticActor(ChkptModule):
-    def __init__(self, args, network_type):
-        super().__init__(args, network_type)
+    def __init__(self, config, network_type):
+        super().__init__(config, network_type)
         # 获取 args 中的维度信息
-        self.fc_input_dim = args.agent_obs_dim[0]
-        self.hidden_dim = SAC_CONFIG["actor_hidden_dim"]
-        self.output_dim = args.agent_action_dim
+        self.fc_input_dim = config.env.agent_obs_dim[0]
+        self.hidden_dim = config.params["actor_hidden_dim"]
+        self.output_dim = config.env.agent_action_dim
 
         # 定义 actor 的核心网络
         self.fc1 = nn.Linear(self.fc_input_dim, self.hidden_dim)
@@ -51,12 +50,13 @@ class StochasticActor(ChkptModule):
 
 
 class StochasticCritic(ChkptModule):
-    def __init__(self, args, network_type):
-        super(StochasticCritic, self).__init__(args, network_type)
+    def __init__(self, config, network_type):
+        super(StochasticCritic, self).__init__(config, network_type)
 
         # 获取 args 中的维度信息
-        self.fc_input_dim = args.agent_obs_dim[0] + args.agent_action_dim
-        self.hidden_dim = SAC_CONFIG["critic_hidden_dim"]
+        # 获取 args 中的维度信息
+        self.fc_input_dim = config.env.agent_obs_dim[0] + config.env.agent_action_dim
+        self.hidden_dim = config.params["critic_hidden_dim"]
         self.output_dim = 1
 
         # 定义 Critic 的核心网络
@@ -80,20 +80,20 @@ class StochasticCritic(ChkptModule):
 
 
 class StochasticActor2d(ChkptModule):
-    def __init__(self, args, network_type):
-        super().__init__(args, network_type)
+    def __init__(self, config, network_type):
+        super().__init__(config, network_type)
 
         self.cnn = FeatureModel()
 
         # Compute the size of the output from conv layers
-        conv_out_size = get_conv_out_size(args.agent_obs_dim, self.cnn)
+        conv_out_size = get_conv_out_size(config.env.agent_obs_dim, self.cnn)
 
         # Fully connected layers
-        hidden_dim = SAC_CONFIG["actor_hidden_dim"]
-        self.fc1 = nn.Linear(conv_out_size, args.actor_hidden_dim)
+        hidden_dim = config.params["actor_hidden_dim"]
+        self.fc1 = nn.Linear(conv_out_size, hidden_dim)
         self.fc2 = nn.Linear(hidden_dim, int(hidden_dim / 2))
-        self.mu = nn.Linear(int(hidden_dim / 2), args.agent_action_dim)
-        self.std = nn.Linear(int(hidden_dim / 2), args.agent_action_dim)
+        self.mu = nn.Linear(int(hidden_dim / 2), config.env.agent_action_dim)
+        self.std = nn.Linear(int(hidden_dim / 2), config.env.agent_action_dim)
 
         # Initialize weights
         self.fc1.weight.data.normal_(0, 0.1)
@@ -117,7 +117,7 @@ class StochasticActor2d(ChkptModule):
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
 
-        mu = F.tanh(self.mu(x))
+        mu = self.mu(x)
         std = F.softplus(self.std(x))
 
         # 计算SAC特殊内容
@@ -135,17 +135,17 @@ class StochasticActor2d(ChkptModule):
 
 # define the critic network with pooling layers
 class StochasticCritic2d(ChkptModule):
-    def __init__(self, args, network_type):
-        super().__init__(args, network_type)
+    def __init__(self, config, network_type):
+        super().__init__(config, network_type)
 
         self.cnn = FeatureModel()
 
         # Compute the output size of conv layers
-        conv_out_size = get_conv_out_size(args.agent_obs_dim, self.cnn)
+        conv_out_size = get_conv_out_size(config.env.agent_obs_dim, self.cnn)
 
         # Fully connected layers
-        hidden_dim = SAC_CONFIG["critic_hidden_dim"]
-        self.fc1 = nn.Linear(conv_out_size, hidden_dim)
+        hidden_dim = config.params["critic_hidden_dim"]
+        self.fc1 = nn.Linear(conv_out_size + config.env.agent_action_dim, hidden_dim)
         self.fc2 = nn.Linear(hidden_dim, int(hidden_dim / 2))
         self.q_out = nn.Linear(int(hidden_dim / 2), 1)
 

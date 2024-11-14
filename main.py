@@ -1,26 +1,27 @@
 import torch
 
 from common.arguments import get_args
-from common.utils import make_env, set_random_seed
-from common.logger import Logger
+from common.utils import make_env, set_random_seed, load_config
 from runner.runner import Runner
 
 
 if __name__ == '__main__':
-    # get the params
+    # 获取命令行参数
     args = get_args()
-    env, args = make_env(args)
-    logger = Logger(args)
+    # 加载配置文件
+    config = load_config(args)
+
+    env, config = make_env(config)
     set_random_seed(16)
 
-    runner = Runner(args, env, logger)
-    print("policy_type: ", args.policy_type)
+    runner = Runner(config, env)
+    print("policy_type: ", config.policy_type)
 
     # Execute
-    if args.task_type == "evaluate":
+    if config.task_type == "evaluate":
         print("in evaluate mode!")
         runner.evaluate()
-    elif args.task_type == "compare":
+    elif config.task_type == "compare":
         runner.compare_models_curves()
     else:
         runner.run()

@@ -1,16 +1,16 @@
 import gym
-from env.env_config import *
+import numpy as np
 
 
 class GymEnv:
-    def __init__(self, args):
+    def __init__(self, config):
         # 创建环境
-        if args.scenario_name in ['MountainCarContinuous-v0', 'Pendulum-v1']:
-            self.scenario_name = args.scenario_name
-            if args.evaluate:
-                self.env = gym.make(args.scenario_name, render_mode='human')
+        if config.env.name in ['MountainCarContinuous-v0', 'Pendulum-v1']:
+            self.scenario_name = config.env.name
+            if config.task_type == 'evaluate':
+                self.env = gym.make(config.env.name, render_mode='human')
             else:
-                self.env = gym.make(args.scenario_name)
+                self.env = gym.make(config.env.name)
 
             # 获取观测信息
             self.agent_obs_dim = list(self.env.observation_space.shape)
@@ -24,7 +24,7 @@ class GymEnv:
             self.max_episode_len = self.env.spec.max_episode_steps
 
         else:
-            raise ValueError(f"{args.scenario_name} not supported")
+            raise ValueError(f"{config.env.name} not supported")
 
     def reset(self):
         obs = self.env.reset()
@@ -35,7 +35,7 @@ class GymEnv:
         action = action * self.action_high
         obs_, reward, done, info1, info2 = self.env.step(action)
         if self.scenario_name == "MountainCarContinuous-v0":
-            reward = reward  + np.sum(action)**2*0.1
+            reward = reward + np.sum(action) ** 2 * 0.1
         return obs_, reward, done, [info1, info2]
 
     def render(self):
@@ -43,11 +43,11 @@ class GymEnv:
 
 
 class MpeEnv:
-    def __init__(self, args):
+    def __init__(self, config):
         # 创建环境
-        if args.scenario_name in ['simple']:
+        if config.env.name in ['simple']:
             from env.mpe.make_env import make_env
-            self.env = make_env(args.scenario_name)
+            self.env = make_env(config.env.name)
 
             # 获取观测信息
             self.agent_obs_dim = list(self.env.observation_space[0].shape)
@@ -61,7 +61,7 @@ class MpeEnv:
             self.max_episode_len = 25
 
         else:
-            raise ValueError(f"{args.scenario_name} not supported")
+            raise ValueError(f"{config.env.name} not supported")
 
     def reset(self):
         obs = self.env.reset()
@@ -77,18 +77,19 @@ class MpeEnv:
     def render(self):
         self.env.render()
 
-class Env:
-    def __init__(self, args):
-        # 创建环境
-        if args.scenario_name in ['MountainCarContinuous-v0', 'Pendulum-v1']:
-            self.env = GymEnv(args)
 
-        elif args.scenario_name in ['simple']:
+class Env:
+    def __init__(self, config):
+        # 创建环境
+        if config.env.name in ['MountainCarContinuous-v0', 'Pendulum-v1']:
+            self.env = GymEnv(config)
+
+        elif config.env.name in ['simple']:
             from env.mpe.make_env import make_env
-            self.env = MpeEnv(args)
+            self.env = MpeEnv(config)
 
         else:
-            raise ValueError(f"{args.scenario_name} not supported")
+            raise ValueError(f"{config.env.name} not supported")
 
         # 获取观测信息
         self.agent_obs_dim = self.env.agent_obs_dim

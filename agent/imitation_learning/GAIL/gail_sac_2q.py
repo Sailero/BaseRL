@@ -2,39 +2,40 @@ import numpy as np
 import os
 import torch
 import torch.nn.functional as F
-from agent.off_policy.offp_config import *
 
 
 class GailSAC:
     name = 'GAIL_SAC_2q'
 
-    def __init__(self, args):
+    def __init__(self, config):
         # 设备信息
-        self.device = args.device
-        self.alpha_log_save_path = os.path.join(args.save_path, 'parameters/alpha_log.pth')
+        self.device = config.device.device
+        self.alpha_log_save_path = os.path.join(config.save_path, 'parameters/alpha_log.pth')
 
         # Parameters of SAC
-        self.gamma = SAC_CONFIG["gamma"]
-        self.tau = SAC_CONFIG["tau"]
-        self.lr_alpha = SAC_CONFIG["lr_alpha"]
+        self.gamma = config.params["gamma"]
+        self.tau = config.params["tau"]
+        self.lr_alpha = config.params["lr_alpha"]
+        self.max_grad_norm = config.params["max_grad_norm"]
 
         # import network
-        if len(args.agent_obs_dim) == 1:
-            from sac_actor_critic import StochasticActor as ActorSAC, StochasticCritic as CriticSAC
+        if len(config.env.agent_obs_dim) == 1:
+            from agent.off_policy.SAC.sac_actor_critic import StochasticActor as ActorSAC, StochasticCritic as CriticSAC
         else:
-            from sac_actor_critic import StochasticActor2d as ActorSAC, StochasticCritic2d as CriticSAC
+            from agent.off_policy.SAC.sac_actor_critic import StochasticActor2d as ActorSAC, \
+                StochasticCritic2d as CriticSAC
 
         # create the network
-        self.actor_net = ActorSAC(args, 'actor').to(self.device)
-        self.critic_1 = CriticSAC(args, 'critic_1').to(self.device)
-        self.critic_2 = CriticSAC(args, 'critic_2').to(self.device)
-        self.critic_target_1 = CriticSAC(args, 'critic_target_1').to(self.device)
-        self.critic_target_2 = CriticSAC(args, 'critic_target_2').to(self.device)
+        self.actor_net = ActorSAC(config, 'actor').to(self.device)
+        self.critic_1 = CriticSAC(config, 'critic_1').to(self.device)
+        self.critic_2 = CriticSAC(config, 'critic_2').to(self.device)
+        self.critic_target_1 = CriticSAC(config, 'critic_target_1').to(self.device)
+        self.critic_target_2 = CriticSAC(config, 'critic_target_2').to(self.device)
 
-        self.expert_critic_1 = CriticSAC(args, 'expert_critic_1').to(self.device)
-        self.expert_critic_2 = CriticSAC(args, 'expert_critic_2').to(self.device)
-        self.expert_critic_target_1 = CriticSAC(args, 'expert_critic_target_1').to(self.device)
-        self.expert_critic_target_2 = CriticSAC(args, 'expert_critic_target_2').to(self.device)
+        self.expert_critic_1 = CriticSAC(config, 'expert_critic_1').to(self.device)
+        self.expert_critic_2 = CriticSAC(config, 'expert_critic_2').to(self.device)
+        self.expert_critic_target_1 = CriticSAC(config, 'expert_critic_target_1').to(self.device)
+        self.expert_critic_target_2 = CriticSAC(config, 'expert_critic_target_2').to(self.device)
 
         self.critic_target_1.load_state_dict(self.critic_1.state_dict())
         self.critic_target_2.load_state_dict(self.critic_2.state_dict())
@@ -43,40 +44,28 @@ class GailSAC:
 
         # create the optimizer 可控制需要优化的参数
         self.actor_optim = torch.optim.Adam(filter(lambda p: p.requires_grad, self.actor_net.parameters()),
-                                            lr=SAC_CONFIG["lr_actor"])
+                                            lr=config.params["lr_actor"])
         self.critic_1_optim = torch.optim.Adam(filter(lambda p: p.requires_grad, self.critic_1.parameters()),
-                                             lr=SAC_CONFIG["lr_critic"])
+                                               lr=config.params["lr_critic"])
         self.critic_2_optim = torch.optim.Adam(filter(lambda p: p.requires_grad, self.critic_2.parameters()),
-                                               lr=SAC_CONFIG["lr_critic"])
-        self.expert_critic_1_optim = torch.optim.Adam(filter(lambda p: p.requires_grad, self.expert_critic_1.parameters()),
-                                             lr=SAC_CONFIG["lr_critic"])
-        self.expert_critic_2_optim = torch.optim.Adam(filter(lambda p: p.requires_grad, self.expert_critic_2.parameters()),
-                                               lr=SAC_CONFIG["lr_critic"])
+                                               lr=config.params["lr_critic"])
+        self.expert_critic_1_optim = torch.optim.Adam(
+            filter(lambda p: p.requires_grad, self.expert_critic_1.parameters()),
+            lr=config.params["lr_critic"])
+        self.expert_critic_2_optim = torch.optim.Adam(
+            filter(lambda p: p.requires_grad, self.expert_critic_2.parameters()),
+            lr=config.params["lr_critic"])
 
         self.alpha_log = torch.tensor(np.log(0.01), dtype=torch.float32, requires_grad=True, device=self.device)
         self.alpha_optim = torch.optim.Adam((self.alpha_log,), lr=self.lr_alpha)
-        self.target_entropy = args.agent_action_dim
-
-        # 记录训练过程数据
-        self.train_record = {"SAC_Dual_Q/reward": [], "SAC_Dual_Q/td_target": []}
-
-    @property
-    def critic_net(self):
-        return self.critic_1
-
-    def add_graph(self, obs, action, logger):
-        from agent.modules.wrapper import WrapperStateAction2
-        wrapper = WrapperStateAction2(self.actor_net, self.critic_1)
-        logger.add_graph(wrapper, (obs, action))
+        self.target_entropy = config.env.agent_action_dim
 
     def choose_action(self, observation):
         # Choose action based on actor network
         inputs = observation.clone().detach().unsqueeze(0).to(self.device)
         with torch.no_grad():
             action, _ = self.actor_net(inputs)
-
         action = action[0].cpu().detach().numpy()
-
         action = np.clip(action, -1, 1)
         return action.tolist()
 
@@ -132,8 +121,6 @@ class GailSAC:
 
     # update the network
     def train(self, transitions):
-        self.train_record[self.name + '/reward'] = transitions['reward']
-
         # Transit tensor to gpu
         for key in transitions.keys():
             # 如果不是tensor，则转换为tensor
@@ -149,24 +136,23 @@ class GailSAC:
         # 更新两个Q网络
         td_target = self.calc_target(trans_reward, trans_next_obs, trans_done, self.critic_target_1,
                                      self.critic_target_2)
-        expert_td_target = self.calc_target(trans_expert_reward, trans_next_obs, trans_done, self.expert_critic_target_1,
-                                     self.expert_critic_target_2)
-        self.train_record[self.name + '/td_target'] = td_target.squeeze(1).cpu().detach().numpy().tolist()
-        self.train_record[self.name + '/expert_td_target'] = expert_td_target.squeeze(1).cpu().detach().numpy().tolist()
+        expert_td_target = self.calc_target(trans_expert_reward, trans_next_obs, trans_done,
+                                            self.expert_critic_target_1,
+                                            self.expert_critic_target_2)
 
         critic_1_loss = torch.mean(
             F.mse_loss(self.critic_1(trans_obs, trans_action), td_target.detach()))
-        self.train_record[self.name + '/critic_1_loss'] = critic_1_loss.item()
 
         critic_2_loss = torch.mean(
             F.mse_loss(self.critic_2(trans_obs, trans_action), td_target.detach()))
-        self.train_record[self.name + '/critic_2_loss'] = critic_2_loss.item()
 
         self.critic_1_optim.zero_grad()
         self.critic_2_optim.zero_grad()
 
         critic_1_loss.backward()
         critic_2_loss.backward()
+        torch.nn.utils.clip_grad_norm_(self.critic_1.parameters(), self.max_grad_norm)
+        torch.nn.utils.clip_grad_norm_(self.critic_2.parameters(), self.max_grad_norm)
 
         self.critic_1_optim.step()
         self.critic_2_optim.step()
@@ -174,17 +160,17 @@ class GailSAC:
         # Expert critic network update
         expert_critic_1_loss = torch.mean(
             F.mse_loss(self.expert_critic_1(trans_obs, trans_action), expert_td_target.detach()))
-        self.train_record[self.name + '/expert_critic_1_loss'] = expert_critic_1_loss.item()
 
         expert_critic_2_loss = torch.mean(
             F.mse_loss(self.expert_critic_2(trans_obs, trans_action), expert_td_target.detach()))
-        self.train_record[self.name + '/expert_critic_2_loss'] = expert_critic_2_loss.item()
 
         self.expert_critic_1_optim.zero_grad()
         self.expert_critic_2_optim.zero_grad()
 
         expert_critic_1_loss.backward()
         expert_critic_2_loss.backward()
+        torch.nn.utils.clip_grad_norm_(self.expert_critic_1.parameters(), self.max_grad_norm)
+        torch.nn.utils.clip_grad_norm_(self.expert_critic_2.parameters(), self.max_grad_norm)
 
         self.expert_critic_1_optim.step()
         self.expert_critic_2_optim.step()
@@ -195,21 +181,20 @@ class GailSAC:
 
         # 更新alpha值
         alpha_loss = torch.mean((self.target_entropy - entropy).detach() * self.alpha_log.exp())
-        self.train_record[self.name + '/alpha_loss'] = alpha_loss.item()
 
         self.alpha_optim.zero_grad()
         alpha_loss.backward()
+        torch.nn.utils.clip_grad_norm_([self.alpha_log], self.max_grad_norm)
         self.alpha_optim.step()
 
         # 更新策略网络
         q1_value = self.expert_critic_1(trans_obs, new_actions)
         q2_value = self.expert_critic_2(trans_obs, new_actions)
         actor_loss = -torch.mean(torch.min(q1_value, q2_value) - self.alpha_log.exp() * entropy)
-        self.train_record[self.name + '/actor_loss'] = actor_loss.item()
-        self.train_record[self.name + '/alpha'] = self.alpha_log.exp().item()
 
         self.actor_optim.zero_grad()
         actor_loss.backward()
+        torch.nn.utils.clip_grad_norm_(self.actor_net.parameters(), self.max_grad_norm)
         self.actor_optim.step()
 
         self.soft_update(self.critic_1, self.critic_target_1)

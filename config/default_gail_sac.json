@@ -1,0 +1,11 @@
+{
+    "policy_type": "GAIL_SAC",
+    "params": {
+        "lr_alpha": 5e-5,
+        "tau": 0.01,
+        "buffer_size": 1e5,
+        "batch_size": 1024,
+        "discr_hidden_dim": 128,
+        "lr_discr": 5e-5
+    }
+}

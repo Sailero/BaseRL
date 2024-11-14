@@ -1,0 +1,41 @@
+{
+    "device": {
+        "gpu_id": "0"
+    },
+
+    "params": {
+        "gamma": 0.95,
+        "max_grad_norm": 0.5,
+        "actor_hidden_dim": 128,
+        "critic_hidden_dim": 128,
+        "lr_actor": 2e-5,
+        "lr_critic": 1e-4
+    },
+
+    "train": {
+        "simple": {
+            "train_episodes": 3000,
+            "display_episodes": 300,
+            "evaluate_episodes": 100,
+            "load_pre_model": false,
+            "force_save_model": false,
+            "save_last_model": true
+        },
+        "MountainCarContinuous-v0": {
+            "train_episodes": 1000,
+            "display_episodes": 100,
+            "evaluate_episodes": 100,
+            "load_pre_model": false,
+            "force_save_model": false,
+            "save_last_model": true
+        },
+        "Pendulum-v1": {
+            "train_episodes": 2000,
+            "display_episodes": 100,
+            "evaluate_episodes": 100,
+            "load_pre_model": false,
+            "force_save_model": false,
+            "save_last_model": true
+        }
+    }
+}

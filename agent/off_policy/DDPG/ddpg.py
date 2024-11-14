@@ -1,48 +1,46 @@
 import torch
 import numpy as np
-from agent.modules.wrapper import WrapperState2
-from agent.off_policy.offp_config import *
 
 
 class DDPG:
-    name="DDPG"
+    name = "DDPG"
 
-    def __init__(self, args):
+    def __init__(self, config):
         # Read the training parameters from args
-        self.action_dim = args.agent_action_dim
-        self.device = args.device
+        self.action_dim = config.env.agent_action_dim
+        self.device = config.device.device
 
         # Parameters of DDPG
-        self.noise_rate = DDPG_CONFIG["noise_rate"] / 2 if args.task_type == "evaluate" else DDPG_CONFIG["noise_rate"]
-        self.epsilon = 0 if args.task_type == "evaluate" else DDPG_CONFIG["epsilon"]
-        self.tau = DDPG_CONFIG["tau"]
-        self.gamma = DDPG_CONFIG["gamma"]
+        self.noise_rate = config.params["noise_rate"] / 2 if config.task_type == "evaluate" else config.params["noise_rate"]
+        self.epsilon = 0 if config.task_type == "evaluate" else config.params["epsilon"]
+        self.tau = config.params["tau"]
+        self.gamma = config.params["gamma"]
+        self.max_grad_norm = config.params["max_grad_norm"]
 
         # import network
-        if len(args.agent_obs_dim) == 1:
-            from ddpg_actor_critic import DeterministicActor as Actor, DeterministicCritic as Critic
+        if len(config.env.agent_obs_dim) == 1:
+            from agent.off_policy.DDPG.ddpg_actor_critic import DeterministicActor as Actor, \
+                DeterministicCritic as Critic
         else:
-            from ddpg_actor_critic import DeterministicActor2d as Actor, DeterministicCritic2d as Critic
-
+            from agent.off_policy.DDPG.ddpg_actor_critic import DeterministicActor2d as Actor, \
+                DeterministicCritic2d as Critic
 
         # create the network
-        self.actor_network = Actor(args, 'actor').to(self.device)
-        self.critic_network = Critic(args, 'critic').to(self.device)
+        self.actor_network = Actor(config, 'actor').to(self.device)
+        self.critic_network = Critic(config, 'critic').to(self.device)
 
         # build up the target network
-        self.actor_target_network = Actor(args, 'target_actor').to(self.device)
-        self.critic_target_network = Critic(args, 'target_critic').to(self.device)
+        self.actor_target_network = Actor(config, 'target_actor').to(self.device)
+        self.critic_target_network = Critic(config, 'target_critic').to(self.device)
 
         # load the weights into the target networks
         self.actor_target_network.load_state_dict(self.actor_network.state_dict())
         self.critic_target_network.load_state_dict(self.critic_network.state_dict())
 
         # create the optimizer
-        self.actor_optim = torch.optim.Adam(self.actor_network.parameters(), lr=DDPG_CONFIG["lr_actor"])
-        self.critic_optim = torch.optim.Adam(self.critic_network.parameters(), lr=DDPG_CONFIG["lr_critic"])
+        self.actor_optim = torch.optim.Adam(self.actor_network.parameters(), lr=config.params["lr_actor"])
+        self.critic_optim = torch.optim.Adam(self.critic_network.parameters(), lr=config.params["lr_critic"])
 
-        # 记录训练过程数据
-        self.train_record = dict()
 
     # soft update
     def _soft_update_target_network(self):
@@ -52,9 +50,6 @@ class DDPG:
         for target_param, param in zip(self.critic_target_network.parameters(), self.critic_network.parameters()):
             target_param.data.copy_((1 - self.tau) * target_param.data + self.tau * param.data)
 
-    def add_graph(self, obs, action, logger):
-        wrapper = WrapperState2(self.actor_network, self.critic_network)
-        logger.add_graph(wrapper, obs)
 
     # update the network
     def train(self, transitions):
@@ -81,18 +76,15 @@ class DDPG:
         batch_online_action = self.actor_network(batch_obs)
         actor_loss = - (self.critic_network(batch_obs, batch_online_action) - q_value.detach()).mean()
 
-        self.train_record[self.name + '/actor_loss'] = actor_loss.item()
-        self.train_record[self.name + '/critic_loss'] = critic_loss.item()
-
         # update the network
         self.actor_optim.zero_grad()
         actor_loss.backward()
-        torch.nn.utils.clip_grad_norm_(self.actor_network.parameters(), 0.5)
+        torch.nn.utils.clip_grad_norm_(self.actor_network.parameters(), self.max_grad_norm)
         self.actor_optim.step()
 
         self.critic_optim.zero_grad()
         critic_loss.backward()
-        torch.nn.utils.clip_grad_norm_(self.critic_network.parameters(), 0.5)
+        torch.nn.utils.clip_grad_norm_(self.critic_network.parameters(), self.max_grad_norm)
         self.critic_optim.step()
 
         self._soft_update_target_network()
@@ -103,7 +95,7 @@ class DDPG:
             action = np.random.uniform(-1, 1, self.action_dim)
         else:
             # 确保观测数据也迁移到 GPU
-            inputs = torch.tensor(observation, dtype=torch.float32).unsqueeze(0).to(self.device)
+            inputs = observation.unsqueeze(0)
             pi = self.actor_network(inputs).squeeze(0)
             action = pi.cpu().detach().numpy()
 

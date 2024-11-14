@@ -10,6 +10,11 @@ POLICY_MAP = {
         'buffer': 'agent.off_policy.replay_buffer.Buffer',
         'online_policy': False
     },
+    'SAC_2Q': {
+        'policy': 'agent.off_policy.SAC.sac_2q.SAC',
+        'buffer': 'agent.off_policy.replay_buffer.Buffer',
+        'online_policy': False
+    },
     'PPO': {
         'policy': 'agent.on_policy.PPO.ppo.PPO',
         'buffer': 'agent.on_policy.replay_buffer.Buffer',

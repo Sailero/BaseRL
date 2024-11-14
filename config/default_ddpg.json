@@ -1,0 +1,10 @@
+{
+    "policy_type": "DDPG",
+    "params": {
+        "tau": 0.01,
+        "epsilon": 0.1,
+        "noise_rate": 0.1,
+        "buffer_size": 1e5,
+        "batch_size": 1024
+    }
+}

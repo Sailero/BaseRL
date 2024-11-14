@@ -1,55 +1,47 @@
 import numpy as np
 import torch
-from agent.modules.wrapper import WrapperState2
-from agent.on_policy.onp_config import PPO_CONFIG
 
 
 class GailPPO:
     name = 'GailPPO'
 
-    def __init__(self, args):
-        # Read the training parameters from args
-        self.action_dim = args.agent_action_dim
-        self.device = args.device  # 设备信息
+    def __init__(self, config):
+        # Read the training parameters from config
+        self.action_dim = config.env.agent_action_dim
+        self.device = config.device.device  # 设备信息
 
         # Parameters of PPO
-        self.batch_size = PPO_CONFIG["batch_size"]
-        self.max_grad_norm = PPO_CONFIG["max_grad_norm"]
-        self.gamma = PPO_CONFIG["gamma"]
-        self.lam = PPO_CONFIG["lam"]
-        self.eps_clip = PPO_CONFIG["eps_clip"]
-        self.update_nums = PPO_CONFIG["update_nums"]
-        self.ent_coef = PPO_CONFIG["ent_coef"]
+        self.batch_size = config.params["batch_size"]
+        self.max_grad_norm = config.params["max_grad_norm"]
+        self.gamma = config.params["gamma"]
+        self.lam = config.params["lam"]
+        self.eps_clip = config.params["eps_clip"]
+        self.update_nums = config.params["update_nums"]
+        self.ent_coef = config.params["ent_coef"]
 
         # import network
-        if len(args.agent_obs_dim) == 1:
-            from ppo_actor_critic import StochasticActor as Actor, StochasticCritic as Critic
+        if len(config.env.agent_obs_dim) == 1:
+            from agent.on_policy.PPO.ppo_actor_critic import StochasticActor as Actor, StochasticCritic as Critic
         else:
-            from ppo_actor_critic import StochasticActor2d as Actor, StochasticCritic2d as Critic
+            from agent.on_policy.PPO.ppo_actor_critic import StochasticActor2d as Actor, StochasticCritic2d as Critic
 
         # create the network
-        self.actor_net = Actor(args, 'actor').to(self.device)
-        self.old_actor_net = Actor(args, 'old_actor').to(self.device)
-        self.critic_net= Critic(args, 'critic').to(self.device)
-        self.expert_critic_net = Critic(args, 'expert_critic').to(self.device)
+        self.actor_net = Actor(config, 'actor').to(self.device)
+        self.old_actor_net = Actor(config, 'old_actor').to(self.device)
+        self.critic_net = Critic(config, 'critic').to(self.device)
+        self.expert_critic_net = Critic(config, 'expert_critic').to(self.device)
 
         # load the parameters
         self.old_actor_net.load_state_dict(self.actor_net.state_dict())
 
         # create the optimizer 可控制需要优化的参数
         self.actor_optim = torch.optim.Adam(filter(lambda p: p.requires_grad, self.actor_net.parameters()),
-                                            lr=PPO_CONFIG["lr_actor"])
+                                            lr=config.params["lr_actor"])
         self.critic_optim = torch.optim.Adam(filter(lambda p: p.requires_grad, self.critic_net.parameters()),
-                                             lr=PPO_CONFIG["lr_critic"])
-        self.expert_critic_optim = torch.optim.Adam(filter(lambda p: p.requires_grad, self.expert_critic_net.parameters()),
-                                             lr=PPO_CONFIG["lr_critic"])
-
-        # 记录训练过程数据
-        self.train_record = dict()
-
-    def add_graph(self, obs, action, logger):
-        wrapper = WrapperState2(self.actor_net, self.critic_net)
-        logger.add_graph(wrapper, obs)
+                                             lr=config.params["lr_critic"])
+        self.expert_critic_optim = torch.optim.Adam(
+            filter(lambda p: p.requires_grad, self.expert_critic_net.parameters()),
+            lr=config.params["lr_critic"])
 
     # GAE (Generalized Advantage Estimation)
     def compute_gae(self, rewards, values, next_values, dones):
@@ -97,12 +89,10 @@ class GailPPO:
         with torch.no_grad():
             tran_value = self.critic_net(trans_obs)
             tran_next_value = self.critic_net(trans_next_obs)
-            self.train_record[self.name + '/v'] = tran_value.squeeze(1).cpu().detach().numpy().tolist()
 
         # Calculate target values and advantages before updating
         with torch.no_grad():
             advantages = self.compute_gae(trans_reward, tran_value, tran_next_value, trans_done)
-            self.train_record[self.name + '/advantages'] = advantages.tolist()
             advantages = torch.tensor(advantages, dtype=torch.float32).reshape(tran_next_value.shape).to(self.device)
             returns = advantages + tran_value  # Rt = At + V(st)
 
@@ -128,8 +118,6 @@ class GailPPO:
                 torch.nn.utils.clip_grad_norm_(self.expert_critic_net.parameters(), self.max_grad_norm)
                 self.expert_critic_optim.step()
 
-                self.train_record[self.name + '/expert_critic_loss'] = expert_critic_loss.item()
-
                 # Calculate old log probs
                 with torch.no_grad():
                     old_pi_mu, old_pi_sigma = self.old_actor_net(batch_obs)
@@ -150,8 +138,7 @@ class GailPPO:
 
                 # Add entropy to encourage exploration
                 entropy = dist.entropy().mean()
-                actor_loss = -torch.min(surr1, surr2).mean()  - self.ent_coef * entropy
-                self.train_record[self.name + '/actor_loss'] = actor_loss.item()
+                actor_loss = -torch.min(surr1, surr2).mean() - self.ent_coef * entropy
 
                 # Critic update
                 gae_value = self.critic_net(batch_obs)
@@ -162,7 +149,6 @@ class GailPPO:
                 critic_loss.backward()
                 torch.nn.utils.clip_grad_norm_(self.critic_net.parameters(), self.max_grad_norm)
                 self.critic_optim.step()
-                self.train_record[self.name + '/critic_loss'] = critic_loss.item()
 
                 # Update the network
                 self.actor_optim.zero_grad()

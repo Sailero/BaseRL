@@ -1,11 +1,9 @@
-from agent.on_policy.onp_config import BUFFER_CONFIG
-
 
 class Buffer:
-    def __init__(self, args):
+    def __init__(self, config):
         # Initialize the arguments parameters
         self.buffer = None
-        self.buffer_size = BUFFER_CONFIG["buffer_size"]
+        self.buffer_size = config.params.buffer_size
 
         # Initialize the buffer
         self.initial_buffer()

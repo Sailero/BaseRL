@@ -1,15 +1,14 @@
 import numpy as np
-from agent.off_policy.offp_config import BUFFER_CONFIG
 
 
 class Buffer:
-    def __init__(self, args):
+    def __init__(self, config):
         # Initialize the arguments parameters
         self.buffer = None
-        self.buffer_size = int(BUFFER_CONFIG["buffer_size"])
-        self.agent_obs_dim = args.agent_obs_dim
-        self.agent_action_dim = args.agent_action_dim
-        self.batch_size = int(BUFFER_CONFIG["batch_size"])
+        self.buffer_size = int(config.params["buffer_size"])
+        self.agent_obs_dim = config.env.agent_obs_dim
+        self.agent_action_dim = config.env.agent_action_dim
+        self.batch_size = int(config.params["batch_size"])
 
         # memory management
         self.current_size = 0
@@ -17,15 +16,6 @@ class Buffer:
 
         # Initialize the buffer
         self.initial_buffer()
-
-        self.record = {"obs": [], "next_obs": [], "action": [], "done": [], "reward": []}
-
-    @property
-    def data(self):  # 这里SAC的data是self.record
-        data_buffer = {}
-        for key in self.buffer.keys():
-            data_buffer[key] = self.buffer[key][:self.current_size]
-        return data_buffer
 
     def store_episode(self, obs, action, reward, next_obs, done):
         self.buffer['reward'][self.store_i] = reward
@@ -36,9 +26,6 @@ class Buffer:
 
         self.current_size = min(self.current_size + 1, self.buffer_size)
         self.store_i = (self.store_i + 1) % self.buffer_size
-
-        self.record["action"].append(action)
-        self.record["reward"].append(reward)
 
     def sample(self):
         sample_buffer = {}
