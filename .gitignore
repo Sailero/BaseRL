@@ -1,9 +1,9 @@
 .idea
 __pycache__/
+*.txt
 
-# 忽略训练相关文件
+
 model
 
-# 忽略配置文件中所有非 default_ 开头的文件
 config/*
 !config/default_*
