@@ -16,6 +16,7 @@ if __name__ == '__main__':
     2. Loads configuration from a file.
     3. Creates the environment and sets the random seed for reproducibility.
     4. Initializes the runner (agent) and starts training, evaluation, or comparison.
+    try
     """
     # 1. Get command-line arguments
     args = get_args()
